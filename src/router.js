@@ -1,23 +1,28 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import Home from './views/Home.vue'
 
 Vue.use(Router)
-
 export default new Router({
   routes: [
     {
-      path: '/',
-      name: 'home',
-      component: Home
+      path: '/googleAuth',
+      name: 'GoogleAuth',
+      component: () => import('./components/GoogleAuth.vue')
     },
     {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (about.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import(/* webpackChunkName: "about" */ './views/About.vue')
+      path: '/chat',
+      name: 'Chat',
+      component: () => import('./components/Chat.vue')
+    },
+    {
+      path: '/chat/usersList',
+      name: 'UsersList',
+      component: () => import('./components/chat/UsersList.vue')
+    },
+    {
+      path: '/chat/space',
+      name: 'Space',
+      component: () => import('./components/chat/Space.vue')
     }
   ]
 })
