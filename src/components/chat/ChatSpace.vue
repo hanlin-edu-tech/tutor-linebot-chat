@@ -1,13 +1,14 @@
 <template>
   <div id="space" class="layout">
     <Layout>
-      <Sider class="sider" width="300" breakpoint="md"
-             :collapsible="isCollapsible" :collapsed-width="78" v-model="isCollapsed">
+      <Sider class="sider" :width="siderWidth" breakpoint="md"
+             :collapsible="isCollapsible" :collapsed-width="0" v-model="isCollapsed">
         <UsersList></UsersList>
+        <div slot="trigger"></div>
       </Sider>
       <Layout>
         <Content class="content">
-
+          <ChatRoom></ChatRoom>
         </Content>
       </Layout>
     </Layout>
@@ -15,25 +16,28 @@
 </template>
 
 <script>
-  import UsersList from './UsersList'
+  import UsersList from './ChatUsersList'
+  import ChatRoom from './ChatRoom'
 
   export default {
     name: 'Space',
     components: {
-      UsersList
+      UsersList,
+      ChatRoom
     },
     data () {
       return {
-        isCollapsible: false,
+        isCollapsible: true,
         isCollapsed: false
-      };
+      }
     },
     computed: {
-      menuitemClasses: function () {
-        return [
-          'menu-item',
-          this.isCollapsed ? 'collapsed-menu' : ''
-        ]
+      siderWidth () {
+        if (window.innerWidth < window.innerHeight) {
+          return window.innerWidth
+        } else {
+          return '280'
+        }
       }
     }
   }

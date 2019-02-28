@@ -11,7 +11,9 @@ import 'iview/dist/styles/iview.css';
 // 關閉 vue instance 產生時的提示
 Vue.config.productionTip = false
 Vue.use(MuseUI)
-Vue.use(VueFirestore)
+Vue.use(VueFirestore, {
+  key: 'id'
+})
 
 Vue.component('Layout', Layout);
 Vue.component('Content', Content);

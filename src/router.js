@@ -17,12 +17,12 @@ export default new Router({
     {
       path: '/chat/usersList',
       name: 'UsersList',
-      component: () => import('./components/chat/UsersList.vue')
+      component: () => import('./components/chat/ChatUsersList.vue')
     },
     {
       path: '/chat/space',
       name: 'Space',
-      component: () => import('./components/chat/Space.vue')
+      component: () => import('./components/chat/ChatSpace.vue')
     }
   ]
 })
