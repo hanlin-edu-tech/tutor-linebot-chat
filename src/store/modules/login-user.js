@@ -1,18 +1,18 @@
 export default {
   namespaced: true,
   state: {
-    loginUserEmail: String
+    loginUserInfo: Object
   },
 
   actions: {
-    assignLoginUserEmailAction ({ commit }, loginUserEmail) {
-      commit('assignLoginUserEmail', loginUserEmail)
+    assignLoginUserInfoAction ({ commit }, loginUserInfo) {
+      commit('assignLoginUserInfo', loginUserInfo)
     }
   },
 
   mutations: {
-    assignLoginUserEmail (state, loginUserEmail) {
-      state.loginUserEmail = loginUserEmail
+    assignLoginUserInfo (state, loginUserInfo) {
+      state.loginUserInfo = loginUserInfo
     }
   }
 }

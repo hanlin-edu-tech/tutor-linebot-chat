@@ -3,10 +3,11 @@
     <mu-list textline="two-line">
       <mu-sub-header>今天</mu-sub-header>
       <mu-list-item avatar :ripple="false" button
-                    v-for="(messageInfo, lineUserId) in usersList" :key="lineUserId">
+                    v-for="(messageInfo, lineUserId) in usersList" :key="lineUserId"
+                    @click="entryChatRoom(lineUserId)">
         <mu-list-item-action style="margin-top: 2px;">
           <mu-avatar :size="52">
-            <img src="../../static/img/ehanlin.png">
+            <img :src="messageInfo.lineUserAvatar">
           </mu-avatar>
         </mu-list-item-action>
         <mu-list-item-content style="margin-left: 10px;">
@@ -25,6 +26,7 @@
 </template>
 <script>
   import { firebase, db } from '../../modules/firebase-config'
+  import eventBus from '../../modules/event-bus'
 
   export default {
     name: 'UsersList',
@@ -46,15 +48,20 @@
         }
       })
 
-      // Binding Docs
-      let fourWeeksAgoMs = (604800000 * 4)
-      let timestamp = new Date(Date.now() - fourWeeksAgoMs)
-      let query = db.collection('Messages')
-        .where('updateTime', '>', timestamp)
-        .orderBy('updateTime', 'asc')
+      try {
+        let fourWeeksAgoMs = (604800000 * 4)
+        let timestamp = new Date(Date.now() - fourWeeksAgoMs)
+        let query = db.collection('Messages')
+          .where('updateTime', '>', timestamp)
+          .orderBy('updateTime', 'asc')
 
-      await vueModel.initialUsersList(query)
-      query.onSnapshot(vueModel.messageFire())
+        await vueModel.initialUsersList(query)
+        await query.onSnapshot(vueModel.messageFire())
+      } catch (error) {
+        console.error(error)
+      }
+
+      vueModel.onRead()
     },
 
     methods: {
@@ -65,10 +72,7 @@
         querySnapshot.forEach(messageDoc => {
           let message = messageDoc.data()
           let unreadCount = 0
-          usersList[message.lineUserId] = {
-            lineUserName: message.lineUserName,
-            text: message.text
-          }
+          usersList[message.lineUserId] = vueModel.composeMessageInfo(message)
           vueModel.setUnreadMessages(usersList[message.lineUserId], unreadCount)
         })
         vueModel.usersList = usersList
@@ -77,37 +81,43 @@
       messageFire () {
         let vueModel = this
         return querySnapshot => {
+          let lastMessageDoc
           let lastChange = querySnapshot.docChanges().last()
           if (!lastChange) {
             return
           }
-          let messageDoc = lastChange.doc
 
+          lastMessageDoc = lastChange.doc
           if (lastChange.type === 'added') {
-            let lastMessage = messageDoc.data()
+            let lastMessage = lastMessageDoc.data()
+            if (lastMessage.read === true) {
+              return
+            }
+
             if (vueModel.usersList[lastMessage.lineUserId]) {
               let existedSpecificMessage = vueModel.usersList[lastMessage.lineUserId]
               if (existedSpecificMessage.text !== lastMessage.text) {
-                let newMessageInfo = {
-                  lineUserName: lastMessage.lineUserName,
-                  text: lastMessage.text
-                }
+                let newMessageInfo = vueModel.composeMessageInfo(lastMessage)
                 let specificUnreadMessagesCount = existedSpecificMessage['unreadMessages']['count']
                 vueModel.setUnreadMessages(newMessageInfo, specificUnreadMessagesCount + 1)
                 vueModel.usersList[lastMessage.lineUserId] = newMessageInfo
               }
             } else {
               let unreadCount = 1
-              let newMessageInfo = {
-                lineUserName: lastMessage.lineUserName,
-                text: lastMessage.text
-              }
+              let newMessageInfo = vueModel.composeMessageInfo(lastMessage)
               vueModel.setUnreadMessages(newMessageInfo, unreadCount)
-              vueModel.$set(this.usersList, lastMessage.lineUserId, newMessageInfo)
+              vueModel.$set(vueModel.usersList, lastMessage.lineUserId, newMessageInfo)
             }
-          } else if (lastChange.type === 'updated') {
-            vueModel.$refs.lineUserId.innerText = 0
           }
+        }
+      },
+
+      composeMessageInfo (message) {
+        return {
+          lineUserId: message.lineUserId,
+          lineUserName: message.lineUserName,
+          lineUserAvatar: message.lineUserAvatar,
+          text: message.text
         }
       },
 
@@ -116,6 +126,19 @@
           count: unreadCount,
           countDesc: String(unreadCount)
         }
+      },
+
+      entryChatRoom (lineUserId) {
+        let vueModel = this
+        vueModel.$emit('retrieve-chat-messages', lineUserId)
+      },
+
+      onRead () {
+        let vueModel = this
+        eventBus.$on('read', lineUserId => {
+          let unreadCount = 0
+          vueModel.setUnreadMessages(vueModel.usersList[lineUserId], unreadCount)
+        })
       }
     }
   }

@@ -10,9 +10,9 @@ export default new Router({
       component: () => import('./components/GoogleAuth.vue')
     },
     {
-      path: '/chat',
-      name: 'Chat',
-      component: () => import('./components/Chat.vue')
+      path: '/chat/chatRoom',
+      name: 'ChatRoom',
+      component: () => import('./components/chat/ChatRoom.vue')
     },
     {
       path: '/chat/usersList',
