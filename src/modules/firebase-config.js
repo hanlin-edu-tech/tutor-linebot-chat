@@ -1,22 +1,25 @@
 import firebase from '@firebase/app'
 import '@firebase/firestore'
 import '@firebase/auth'
+import '@firebase/storage'
 
 const config = {
-  apiKey: 'AIzaSyB6vCtgA3G0l1UaeL1VpthGfnLldfT1mXY',
-  authDomain: 'friendlychat-a97f5.firebaseapp.com',
-  databaseURL: 'https://friendlychat-a97f5.firebaseio.com',
-  projectId: 'friendlychat-a97f5',
-  storageBucket: 'friendlychat-a97f5.appspot.com',
-  messagingSenderId: '847240468324'
-}
+  apiKey: "AIzaSyACd0utVIIjEO6voLC2NaGDL6RKHa1-0EA",
+  authDomain: "ehanlinlinebotchat.firebaseapp.com",
+  databaseURL: "https://ehanlinlinebotchat.firebaseio.com",
+  projectId: "ehanlinlinebotchat",
+  storageBucket: "ehanlinlinebotchat.appspot.com",
+  messagingSenderId: "21244896240"
+};
 firebase.initializeApp(config)
 
 const db = firebase.firestore()
 const auth = firebase.auth()
+const storage = firebase.storage()
 
 export {
   firebase,
   db,
-  auth
+  auth,
+  storage
 }

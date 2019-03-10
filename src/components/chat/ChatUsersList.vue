@@ -11,7 +11,7 @@
           </mu-avatar>
         </mu-list-item-action>
         <mu-list-item-content style="margin-left: 10px;">
-          <mu-list-item-title>{{ messageInfo.lineUserName }}</mu-list-item-title>
+          <mu-list-item-title style="font-weight: 500;">{{ messageInfo.lineUserName }}</mu-list-item-title>
           <mu-list-item-sub-title>
             {{ messageInfo.text }}
           </mu-list-item-sub-title>
@@ -33,6 +33,7 @@
     data: () => {
       return {
         messages: [],
+        initialUnreadMessages: {},
         usersList: {}
       }
     },
@@ -60,8 +61,6 @@
       } catch (error) {
         console.error(error)
       }
-
-      vueModel.onRead()
     },
 
     methods: {
@@ -71,11 +70,13 @@
         let usersList = {}
         querySnapshot.forEach(messageDoc => {
           let message = messageDoc.data()
-          let unreadCount = 0
+          vueModel.calculateUnreadMessages(message)
           usersList[message.lineUserId] = vueModel.composeMessageInfo(message)
-          vueModel.setUnreadMessages(usersList[message.lineUserId], unreadCount)
         })
+
+        vueModel.summaryInitialUnreadMessages(usersList)
         vueModel.usersList = usersList
+        vueModel.onRead()
       },
 
       messageFire () {
@@ -112,6 +113,17 @@
         }
       },
 
+      calculateUnreadMessages (message) {
+        const vueModel = this
+        if (message.read === false) {
+          if (vueModel.initialUnreadMessages[message.lineUserId]) {
+            vueModel.initialUnreadMessages[message.lineUserId]++
+          } else {
+            vueModel.initialUnreadMessages[message.lineUserId] = 1
+          }
+        }
+      },
+
       composeMessageInfo (message) {
         return {
           lineUserId: message.lineUserId,
@@ -119,6 +131,22 @@
           lineUserAvatar: message.lineUserAvatar,
           text: message.text
         }
+      },
+
+      summaryInitialUnreadMessages (usersList) {
+        const vueModel = this
+        for (let lineUserId in usersList) {
+          let specificMessageInfo = usersList[lineUserId]
+          if (vueModel.initialUnreadMessages.hasOwnProperty(lineUserId)) {
+            let unreadCount = vueModel.initialUnreadMessages[lineUserId]
+            vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
+          } else {
+            let unreadCount = 0
+            vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
+          }
+        }
+        // console.log(vueModel.initialUnreadMessages)
+        // console.log(vueModel.usersList)
       },
 
       setUnreadMessages (specificMessageInfo, unreadCount) {
@@ -134,7 +162,7 @@
       },
 
       onRead () {
-        let vueModel = this
+        const vueModel = this
         eventBus.$on('read', lineUserId => {
           let unreadCount = 0
           vueModel.setUnreadMessages(vueModel.usersList[lineUserId], unreadCount)
@@ -145,6 +173,10 @@
 </script>
 <style lang="less">
   #users-list {
+    background-color: #fdfbf2;
+    height: 95vh;
+    overflow: scroll;
+
     .mu-item-sub-title {
       font-size: 14px;
     }
