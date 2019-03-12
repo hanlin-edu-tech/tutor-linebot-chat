@@ -6,12 +6,15 @@
                :justify-content="!messageInfo.ehanlin ? 'start' : 'end'">
         <mu-flex class="dialog-row" direction="column"
                  :align-items="!messageInfo.ehanlin ? 'start' : 'end'">
-          <div class="dialog-avatar">
-            <mu-avatar :size="37">
+          <mu-flex class="dialog-avatar" justify-content="start">
+            <mu-avatar style="margin-right: 5px;" :size="37">
               <img :src="!messageInfo.ehanlin ? messageInfo.lineUserAvatar : messageInfo.ehanlinAvatar">
             </mu-avatar>
-            {{ !messageInfo.ehanlin ? messageInfo.lineUserName : messageInfo.ehanlinName}}
-          </div>
+            <mu-flex direction="column" justify-content="start">
+              <span class="update-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
+              {{ !messageInfo.ehanlin ? messageInfo.lineUserName : messageInfo.ehanlinName }}
+            </mu-flex>
+          </mu-flex>
           <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
             <img class="chat-image" :src="messageInfo.imageUrl">
           </a>
@@ -60,6 +63,8 @@
   import { firebase, db, storage } from '../../modules/firebase-config'
   import { mapState } from 'vuex'
   import { showModal } from '../../modules/modal'
+  import dayjs from 'dayjs'
+  import 'dayjs/locale/zh-tw'
 
   export default {
     name: 'ChatRoom',
@@ -100,6 +105,10 @@
     },
 
     methods: {
+      formatUpdateTime (updateTime) {
+        return dayjs(updateTime.toDate()).format('YYYY-MM-DD HH:mm:ss')
+      },
+
       scrollBottom () {
         let dialogTarget = document.getElementById('dialog')
         dialogTarget.scrollTop = dialogTarget.scrollHeight
@@ -115,7 +124,7 @@
           }
 
           lastMessageDoc = lastChange.doc
-          if (lastChange.type === 'added') {
+          if (lastChange.type === 'modified') {
             vueModel.$set(vueModel.messages, lastMessageDoc.id, lastMessageDoc.data())
             vueModel.$nextTick(vueModel.scrollBottom)
           }
@@ -203,7 +212,7 @@
             .where('lineUserId', '==', vueModel.lineUserId)
             .where('updateTime', '>', vueModel.fourWeeksAgo)
             .orderBy('updateTime', 'asc')
-            .limit(1000)
+            .limit(500)
 
           let querySnapshot = await query.get()
           let messages = {}
@@ -333,6 +342,12 @@
       padding: 5px;
     }
 
+    .update-time {
+      color: #6a6a6a;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
     .dialog-flex-left {
       margin-left: 20px;
       margin-top: 5px;
@@ -350,9 +365,9 @@
     }
 
     .dialog-avatar {
-      display: inline-block;
-      margin-bottom: 3px;
-      font-weight: 900;
+      margin-top: 10px;
+      margin-bottom: 5px;
+      font-weight: 700;
     }
 
     .dialog {
@@ -379,7 +394,7 @@
       border-radius: 3px;
       word-break: normal;
       color: #004ec4;
-      font-weight: 500;
+      font-weight: 800;
     }
 
     .chat-image {

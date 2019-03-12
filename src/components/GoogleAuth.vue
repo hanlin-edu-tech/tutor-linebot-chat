@@ -29,7 +29,7 @@
     methods: Object.assign(
       {
         async authenticate () {
-          let vueModel = this
+          const vueModel = this
           auth.useDeviceLanguage()
           try {
             let provider = new firebase.auth.GoogleAuthProvider()
@@ -50,7 +50,7 @@
         },
 
         async validateEhanlinUser (loginResult) {
-          let vueModel = this
+          const vueModel = this
           let querySnapshot = await db.collection('AuthorizedUsers').get()
           if (!querySnapshot) {
             console.log('使用者沒有權限')

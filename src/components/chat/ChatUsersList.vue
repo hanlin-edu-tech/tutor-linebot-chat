@@ -1,7 +1,7 @@
 <template>
   <section id="users-list">
     <mu-list textline="two-line">
-      <mu-sub-header>今天</mu-sub-header>
+      <mu-sub-header style="font-weight: 900;">{{ today }}</mu-sub-header>
       <mu-list-item avatar :ripple="false" button
                     v-for="(messageInfo, lineUserId) in usersList" :key="lineUserId"
                     @click="entryChatRoom(lineUserId)">
@@ -26,6 +26,8 @@
 </template>
 <script>
   import { firebase, db } from '../../modules/firebase-config'
+  import dayjs from 'dayjs'
+  import 'dayjs/locale/zh-tw'
   import eventBus from '../../modules/event-bus'
 
   export default {
@@ -37,10 +39,14 @@
         usersList: {}
       }
     },
-    computed: {},
+    computed: {
+      today () {
+        return dayjs().locale("zh-tw").format('YYYY-MM-DD dddd')
+      }
+    },
 
     async mounted () {
-      let vueModel = this
+      const vueModel = this
       firebase.auth().onAuthStateChanged(function (user) {
         if (user) {
           //console.log(user)
@@ -65,7 +71,7 @@
 
     methods: {
       async initialUsersList (query) {
-        let vueModel = this
+        const vueModel = this
         let querySnapshot = await query.get()
         let usersList = {}
         querySnapshot.forEach(messageDoc => {
@@ -80,7 +86,7 @@
       },
 
       messageFire () {
-        let vueModel = this
+        const vueModel = this
         return querySnapshot => {
           let lastMessageDoc
           let lastChange = querySnapshot.docChanges().last()
@@ -157,7 +163,7 @@
       },
 
       entryChatRoom (lineUserId) {
-        let vueModel = this
+        const vueModel = this
         vueModel.$emit('retrieve-chat-messages', lineUserId)
       },
 

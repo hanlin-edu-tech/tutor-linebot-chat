@@ -50,7 +50,7 @@
     ),
 
     mounted () {
-      let vueModel = this
+      const vueModel = this
       if (Object.keys(vueModel.loginUserInfo).length === 0) {
         auth.signOut()
         vueModel.$router.replace(`/googleAuth`)
@@ -59,7 +59,7 @@
 
     methods: {
       retrieveChatMessages (lineUserId) {
-        let vueModel = this
+        const vueModel = this
         vueModel.lineUserId = lineUserId
       }
     }
