@@ -35,13 +35,12 @@
     data: () => {
       return {
         messages: [],
-        initialUnreadMessages: {},
         usersList: {}
       }
     },
     computed: {
       today () {
-        return dayjs().locale("zh-tw").format('YYYY-MM-DD dddd')
+        return dayjs().locale('zh-tw').format('YYYY-MM-DD dddd')
       }
     },
 
@@ -74,15 +73,15 @@
         const vueModel = this
         let querySnapshot = await query.get()
         let usersList = {}
+        let initialUnreadMessages = {}
         querySnapshot.forEach(messageDoc => {
           let message = messageDoc.data()
-          vueModel.calculateUnreadMessages(message)
+          vueModel.calculateUnreadMessages(initialUnreadMessages, message)
           usersList[message.lineUserId] = vueModel.composeMessageInfo(message)
         })
 
-        vueModel.summaryInitialUnreadMessages(usersList)
+        vueModel.summaryInitialUnreadMessages(initialUnreadMessages, usersList)
         vueModel.usersList = usersList
-        vueModel.onRead()
       },
 
       messageFire () {
@@ -97,36 +96,42 @@
           lastMessageDoc = lastChange.doc
           if (lastChange.type === 'added') {
             let lastMessage = lastMessageDoc.data()
-            if (lastMessage.read === true) {
-              return
-            }
-
             if (vueModel.usersList[lastMessage.lineUserId]) {
               let existedSpecificMessage = vueModel.usersList[lastMessage.lineUserId]
+              /* 現存訊息和最後一則訊息不同，表示為新增的訊息 */
               if (existedSpecificMessage.text !== lastMessage.text) {
-                let newMessageInfo = vueModel.composeMessageInfo(lastMessage)
-                let specificUnreadMessagesCount = existedSpecificMessage['unreadMessages']['count']
-                vueModel.setUnreadMessages(newMessageInfo, specificUnreadMessagesCount + 1)
-                vueModel.usersList[lastMessage.lineUserId] = newMessageInfo
+                existedSpecificMessage.text = lastMessage.text
+                vueModel.usersList[lastMessage.lineUserId] = existedSpecificMessage
+
+                /* 如果訊息未讀 */
+                if (lastMessage.read === false) {
+                  let existedSpecificUnreadCount = existedSpecificMessage['unreadMessages']['count']
+                  vueModel.setUnreadMessages(existedSpecificMessage, existedSpecificUnreadCount + 1)
+                }
               }
             } else {
+              /* 新的使用者傳入訊息 */
               let unreadCount = 1
               let newMessageInfo = vueModel.composeMessageInfo(lastMessage)
               vueModel.setUnreadMessages(newMessageInfo, unreadCount)
               vueModel.$set(vueModel.usersList, lastMessage.lineUserId, newMessageInfo)
             }
+          } else if (lastChange.type === 'modified') { /* 只有更新已讀狀態，才會觸發 */
+            let lastMessage = lastMessageDoc.data()
+            /* 訊息更新為已讀 */
+            let unreadCount = 0
+            vueModel.setUnreadMessages(vueModel.usersList[lastMessage.lineUserId], unreadCount)
           }
         }
       },
 
-      calculateUnreadMessages (message) {
-        const vueModel = this
+      calculateUnreadMessages (initialUnreadMessages, message) {
+        if (!initialUnreadMessages[message.lineUserId]) {
+          initialUnreadMessages[message.lineUserId] = 0
+        }
+
         if (message.read === false) {
-          if (vueModel.initialUnreadMessages[message.lineUserId]) {
-            vueModel.initialUnreadMessages[message.lineUserId]++
-          } else {
-            vueModel.initialUnreadMessages[message.lineUserId] = 1
-          }
+          initialUnreadMessages[message.lineUserId]++
         }
       },
 
@@ -139,20 +144,18 @@
         }
       },
 
-      summaryInitialUnreadMessages (usersList) {
+      summaryInitialUnreadMessages (initialUnreadMessages, usersList) {
         const vueModel = this
         for (let lineUserId in usersList) {
           let specificMessageInfo = usersList[lineUserId]
-          if (vueModel.initialUnreadMessages.hasOwnProperty(lineUserId)) {
-            let unreadCount = vueModel.initialUnreadMessages[lineUserId]
+          if (initialUnreadMessages.hasOwnProperty(lineUserId)) {
+            let unreadCount = initialUnreadMessages[lineUserId]
             vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
           } else {
             let unreadCount = 0
             vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
           }
         }
-        // console.log(vueModel.initialUnreadMessages)
-        // console.log(vueModel.usersList)
       },
 
       setUnreadMessages (specificMessageInfo, unreadCount) {
@@ -165,14 +168,6 @@
       entryChatRoom (lineUserId) {
         const vueModel = this
         vueModel.$emit('retrieve-chat-messages', lineUserId)
-      },
-
-      onRead () {
-        const vueModel = this
-        eventBus.$on('read', lineUserId => {
-          let unreadCount = 0
-          vueModel.setUnreadMessages(vueModel.usersList[lineUserId], unreadCount)
-        })
       }
     }
   }

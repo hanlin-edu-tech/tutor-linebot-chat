@@ -11,8 +11,10 @@
               <img :src="!messageInfo.ehanlin ? messageInfo.lineUserAvatar : messageInfo.ehanlinAvatar">
             </mu-avatar>
             <mu-flex direction="column" justify-content="start">
-              <span class="update-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
-              {{ !messageInfo.ehanlin ? messageInfo.lineUserName : messageInfo.ehanlinName }}
+              <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
+              <span class="dialog-text">
+                {{ !messageInfo.ehanlin ? messageInfo.lineUserName : messageInfo.ehanlinName }}
+              </span>
             </mu-flex>
           </mu-flex>
           <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
@@ -59,7 +61,6 @@
 </template>
 
 <script>
-  import eventBus from '../../modules/event-bus'
   import { firebase, db, storage } from '../../modules/firebase-config'
   import { mapState } from 'vuex'
   import { showModal } from '../../modules/modal'
@@ -114,6 +115,31 @@
         dialogTarget.scrollTop = dialogTarget.scrollHeight
       },
 
+      async retrieveMessages () {
+        const vueModel = this
+        if (vueModel.lineUserId) {
+          const query = db.collection('Messages')
+            .where('lineUserId', '==', vueModel.lineUserId)
+            .where('updateTime', '>', vueModel.fourWeeksAgo)
+            .orderBy('updateTime', 'asc')
+            .limit(500)
+
+          let querySnapshot = await query.get()
+          let messages = {}
+          querySnapshot.forEach(messageDoc => {
+            messages[messageDoc.id] = messageDoc.data()
+          })
+          vueModel.messages = messages
+          if (Object.keys(vueModel.messages).length > 0) {
+            let singleMessage = Object.values(vueModel.messages)[0]
+            vueModel.lineUserName = singleMessage.lineUserName
+            vueModel.lineUserAvatar = singleMessage.lineUserAvatar
+            vueModel.scrollBottom()
+          }
+          query.onSnapshot(vueModel.receivedNewMessage())
+        }
+      },
+
       receivedNewMessage () {
         const vueModel = this
         return querySnapshot => {
@@ -122,11 +148,17 @@
           if (!lastChange) {
             return
           }
-
           lastMessageDoc = lastChange.doc
-          if (lastChange.type === 'modified') {
-            vueModel.$set(vueModel.messages, lastMessageDoc.id, lastMessageDoc.data())
+          if (lastChange.type === 'added') {
+            const lastMessageId = lastMessageDoc.id
+            const lastMessage = lastMessageDoc.data()
+
+            vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
             vueModel.$nextTick(vueModel.scrollBottom)
+
+            if (lastMessage.read === false) {
+              vueModel.updateMessagesToRead(vueModel.lineUserId)
+            }
           }
         }
       },
@@ -205,31 +237,6 @@
         vueModel.isPreviewImage = false
       },
 
-      async retrieveMessages () {
-        const vueModel = this
-        if (vueModel.lineUserId) {
-          const query = db.collection('Messages')
-            .where('lineUserId', '==', vueModel.lineUserId)
-            .where('updateTime', '>', vueModel.fourWeeksAgo)
-            .orderBy('updateTime', 'asc')
-            .limit(500)
-
-          let querySnapshot = await query.get()
-          let messages = {}
-          querySnapshot.forEach(messageDoc => {
-            messages[messageDoc.id] = messageDoc.data()
-          })
-          vueModel.messages = messages
-          if (Object.keys(vueModel.messages).length > 0) {
-            let singleMessage = Object.values(vueModel.messages)[0]
-            vueModel.lineUserName = singleMessage.lineUserName
-            vueModel.lineUserAvatar = singleMessage.lineUserAvatar
-            vueModel.scrollBottom()
-          }
-          query.onSnapshot(vueModel.receivedNewMessage())
-        }
-      },
-
       async updateMessagesToRead (lineUserId) {
         const vueModel = this
         const query = db.collection('Messages')
@@ -246,7 +253,6 @@
         }
 
         await batch.commit()
-        eventBus.$emit('read', lineUserId)
       },
 
       async pushChatMessage (lineUserId, {
@@ -270,7 +276,6 @@
 
         if (response.status === OK_200) {
           vueModel.messageText = ''
-          await vueModel.updateMessagesToRead(lineUserId)
           await vueModel.createMessage({
             messageText: messageText,
             originalImageUrl: originalImageUrl
@@ -286,7 +291,7 @@
           originalImageUrl = '',
         } = {}) {
         const vueModel = this
-        let updateTime = await firebase.firestore.FieldValue.serverTimestamp()
+        let updateTime = await firebase.firestore.Timestamp.fromDate(new Date())
         let loginUserInfo = vueModel.loginUserInfo
         let message = {
           lineUserId: vueModel.lineUserId,
@@ -324,6 +329,7 @@
             originalImageUrl: vueModel.originalImageUrl,
             smallImageUrl: vueModel.smallImageUrl
           })
+        vueModel.cancelImage()
       }
     }
   }
@@ -342,10 +348,15 @@
       padding: 5px;
     }
 
-    .update-time {
+    .dialog-time {
       color: #6a6a6a;
       font-size: 11px;
       font-weight: 500;
+    }
+
+    .dialog-text {
+      font-size: 11px;
+      font-weight: 600;
     }
 
     .dialog-flex-left {
@@ -370,22 +381,14 @@
       font-weight: 700;
     }
 
-    .dialog {
-      background-color: #004ec4;
-      padding: 5px;
-      border-radius: 3px;
-      word-break: normal;
-      color: white;
-      font-weight: 500;
-    }
-
     .dialog-block-user {
       background-color: #004ec4;
       padding: 5px;
       border-radius: 3px;
       word-break: normal;
       color: white;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 600;
     }
 
     .dialog-block-ehanlin {
@@ -394,7 +397,8 @@
       border-radius: 3px;
       word-break: normal;
       color: #004ec4;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 900;
     }
 
     .chat-image {
