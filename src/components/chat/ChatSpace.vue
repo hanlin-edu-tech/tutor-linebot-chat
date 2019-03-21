@@ -3,12 +3,12 @@
     <Layout>
       <Sider class="sider" :width="siderWidth" breakpoint="md"
              :collapsible="isCollapsible" :collapsed-width="0" v-model="isCollapsed">
-        <UsersList @retrieve-chat-messages="retrieveChatMessages"></UsersList>
+        <ChatUsersList @route-chat-room="routeChatRoom"></ChatUsersList>
         <div slot="trigger"></div>
       </Sider>
       <Layout>
         <Content class="content">
-          <ChatRoom :lineUserId="lineUserId"></ChatRoom>
+          <router-view></router-view>
         </Content>
       </Layout>
     </Layout>
@@ -16,15 +16,15 @@
 </template>
 
 <script>
-  import UsersList from './ChatUsersList'
+  import ChatUsersList from './ChatUsersList'
   import ChatRoom from './ChatRoom'
-  import { auth } from '../../modules/firebase-config'
+  import { db, auth } from '../../modules/firebase-config'
   import { mapState } from 'vuex'
 
   export default {
-    name: 'Space',
+    name: 'ChatSpace',
     components: {
-      UsersList,
+      ChatUsersList,
       ChatRoom
     },
 
@@ -32,7 +32,6 @@
       return {
         isCollapsible: true,
         isCollapsed: false,
-        lineUserId: ''
       }
     },
 
@@ -58,10 +57,30 @@
     },
 
     methods: {
-      retrieveChatMessages (lineUserId) {
+      delay (millisecond) {
+        return new Promise(resolve => {
+          setTimeout(resolve, millisecond)
+        })
+      },
+
+      async routeChatRoom (messageInfo, lineUserId) {
         const vueModel = this
-        vueModel.lineUserId = lineUserId
-      }
+        vueModel.$router.replace({ path: `/chat/space/` })
+
+        await vueModel.delay(300)
+        vueModel.$router.replace(
+          {
+            name: 'ChatRoom',
+            params: {
+              specificLineUser: lineUserId,
+              lineUserAvatar: messageInfo.lineUserAvatar,
+              lineUserName: messageInfo.lineUserName,
+            }
+          }
+        )
+        await vueModel.delay(300)
+        vueModel.$root.$emit('assign-line-user', lineUserId)
+      },
     }
   }
 </script>

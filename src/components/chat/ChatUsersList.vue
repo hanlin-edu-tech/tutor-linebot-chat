@@ -2,36 +2,40 @@
   <section id="users-list">
     <mu-list textline="two-line">
       <mu-sub-header style="font-weight: 900;">{{ today }}</mu-sub-header>
-      <mu-list-item avatar :ripple="false" button
+      <mu-list-item avatar :ripple="true" button
                     v-for="(messageInfo, lineUserId) in usersList" :key="lineUserId"
-                    @click="entryChatRoom(lineUserId)">
+                    @click="entryChatRoom(messageInfo, lineUserId)">
         <mu-list-item-action style="margin-top: 2px;">
           <mu-avatar :size="52">
             <img :src="messageInfo.lineUserAvatar">
           </mu-avatar>
         </mu-list-item-action>
         <mu-list-item-content style="margin-left: 10px;">
-          <mu-list-item-title style="font-weight: 500;">{{ messageInfo.lineUserName }}</mu-list-item-title>
+          <mu-list-item-title style="font-weight: 500;">
+            <mu-flex class="flex-wrapper" justify-content="start">
+              {{ messageInfo.lineUserName }}
+              <mu-icon size="22" value="edit"></mu-icon>
+            </mu-flex>
+          </mu-list-item-title>
           <mu-list-item-sub-title>
             {{ messageInfo.text }}
           </mu-list-item-sub-title>
           <mu-divider></mu-divider>
         </mu-list-item-content>
-        <mu-badge v-if="messageInfo.unreadMessages.count > 0"
-                  :content="messageInfo.unreadMessages.countDesc"
+        <mu-badge v-if="messageInfo.unreadMessagesCount > 0"
+                  :content="messageInfo.unreadMessagesCountDesc"
                   color="#9966ff" badge-class="badge-info"></mu-badge>
       </mu-list-item>
     </mu-list>
   </section>
 </template>
 <script>
-  import { firebase, db } from '../../modules/firebase-config'
+  import { db, firebase } from '../../modules/firebase-config'
   import dayjs from 'dayjs'
   import 'dayjs/locale/zh-tw'
-  import eventBus from '../../modules/event-bus'
 
   export default {
-    name: 'UsersList',
+    name: 'ChatUsersList',
     data: () => {
       return {
         messages: [],
@@ -55,119 +59,157 @@
       })
 
       try {
-        let fourWeeksAgoMs = (604800000 * 4)
-        let timestamp = new Date(Date.now() - fourWeeksAgoMs)
-        let query = db.collection('Messages')
-          .where('updateTime', '>', timestamp)
-          .orderBy('updateTime', 'asc')
-
-        await vueModel.initialUsersList(query)
-        await query.onSnapshot(vueModel.messageFire())
+        const chatDocs = await vueModel.retrieveChatDocs()
+        await vueModel.initialUsersList(chatDocs)
+        vueModel.listeningOnChatAdded()
       } catch (error) {
         console.error(error)
       }
     },
 
     methods: {
-      async initialUsersList (query) {
+      async retrieveChatDocs () {
         const vueModel = this
-        let querySnapshot = await query.get()
-        let usersList = {}
-        let initialUnreadMessages = {}
-        querySnapshot.forEach(messageDoc => {
-          let message = messageDoc.data()
-          vueModel.calculateUnreadMessages(initialUnreadMessages, message)
-          usersList[message.lineUserId] = vueModel.composeMessageInfo(message)
-        })
+        const fourWeeksAgo = new Date(Date.now() - (604800000 * 4))
+        const chatRef = db.collection('Chat')
+        const chatQuerySnapshot = await chatRef
+          .where('createTime', '>', fourWeeksAgo)
+          .get()
 
-        vueModel.summaryInitialUnreadMessages(initialUnreadMessages, usersList)
-        vueModel.usersList = usersList
+        vueModel.chatRef = chatRef
+        return chatQuerySnapshot
+          .docChanges()
+          .map(chatDocChange => chatDocChange.doc)
       },
 
-      messageFire () {
+      async retrieveLastMessage (lineUserId) {
         const vueModel = this
-        return querySnapshot => {
-          let lastMessageDoc
-          let lastChange = querySnapshot.docChanges().last()
+        const messagesQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
+          .collection('Message')
+          .orderBy('updateTime', 'desc')
+          .limit(1)
+          .get()
+
+        const messageDocs = messagesQuerySnapshot
+          .docChanges()
+          .map(chatDocChange => chatDocChange.doc)
+
+        return messageDocs.last().data()
+      },
+
+      async initialUsersList (chatDocs) {
+        const vueModel = this
+        const allUsers = {}
+        const unreadUsers = {}
+        for (let chatDoc of chatDocs) {
+          const lineUserId = chatDoc.id
+          const lineUserProfile = chatDoc.data()
+          const lastMessage = await vueModel.retrieveLastMessage(lineUserId)
+          const findUnreadUser = () => {
+            unreadUsers[lineUserId] = {}
+          }
+
+          allUsers[lineUserId] = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage, findUnreadUser)
+          vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
+        }
+        /* 讓有未讀訊息之 lineUserId 保持在物件中的前方 */
+        vueModel.usersList = { ...unreadUsers, ...allUsers }
+      },
+
+      listeningOnMessageAdded (lineUserId, lineUserProfile) {
+        const vueModel = this
+        db.collection(`Chat/${lineUserId}/Message`)
+          .onSnapshot(vueModel.messageFire(lineUserId, lineUserProfile))
+      },
+
+      messageFire (lineUserId, lineUserProfile) {
+        const vueModel = this
+        return async messageQuerySnapshot => {
+          let lastMessage
+          let lastChange = messageQuerySnapshot.docChanges().last()
           if (!lastChange) {
             return
           }
 
-          lastMessageDoc = lastChange.doc
+          lastMessage = lastChange.doc.data()
           if (lastChange.type === 'added') {
-            let lastMessage = lastMessageDoc.data()
-            if (vueModel.usersList[lastMessage.lineUserId]) {
-              let existedSpecificMessage = vueModel.usersList[lastMessage.lineUserId]
-              /* 現存訊息和最後一則訊息不同，表示為新增的訊息 */
-              if (existedSpecificMessage.text !== lastMessage.text) {
-                existedSpecificMessage.text = lastMessage.text
-                vueModel.usersList[lastMessage.lineUserId] = existedSpecificMessage
+            if (vueModel.usersList && vueModel.usersList[lineUserId]) {
+              let existedSpecificMessageInfo = vueModel.usersList[lineUserId]
+              let lastUpdateTime = lastMessage.updateTime.toDate()
+              /* 如果現存訊息的時戳比最後一則訊息早，表示 lastMessage 為新增的訊息 */
+              if (existedSpecificMessageInfo.updateTime.isBefore(dayjs(lastUpdateTime))) {
+                /* 重新取代為新訊息 */
+                vueModel.usersList[lineUserId] =
+                  await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
 
-                /* 如果訊息未讀 */
-                if (lastMessage.read === false) {
-                  let existedSpecificUnreadCount = existedSpecificMessage['unreadMessages']['count']
-                  vueModel.setUnreadMessages(existedSpecificMessage, existedSpecificUnreadCount + 1)
+                if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
+                  let newUserMessageInfo = {}
+                  newUserMessageInfo[lineUserId] = {}
+                  vueModel.usersList = { ...newUserMessageInfo, ...vueModel.usersList }
                 }
               }
-            } else {
-              /* 新的使用者傳入訊息 */
-              let unreadCount = 1
-              let newMessageInfo = vueModel.composeMessageInfo(lastMessage)
-              vueModel.setUnreadMessages(newMessageInfo, unreadCount)
-              vueModel.$set(vueModel.usersList, lastMessage.lineUserId, newMessageInfo)
             }
-          } else if (lastChange.type === 'modified') { /* 只有更新已讀狀態，才會觸發 */
-            let lastMessage = lastMessageDoc.data()
-            /* 訊息更新為已讀 */
-            let unreadCount = 0
-            vueModel.setUnreadMessages(vueModel.usersList[lastMessage.lineUserId], unreadCount)
+          } else if (lastChange.type === 'modified') {
+            /* 當訊息更新為已讀狀態，才會觸發 */
+            let unreadMessagesCount = 0
+            vueModel.usersList[lineUserId].unreadMessagesCount = unreadMessagesCount
+            vueModel.usersList[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
           }
         }
       },
 
-      calculateUnreadMessages (initialUnreadMessages, message) {
-        if (!initialUnreadMessages[message.lineUserId]) {
-          initialUnreadMessages[message.lineUserId] = 0
-        }
+      listeningOnChatAdded () {
+        const vueModel = this
+        vueModel.chatRef.onSnapshot(
+          async chatQuerySnapshot => {
+            let lastChange = chatQuerySnapshot.docChanges().last()
+            let lineUserId, lineUserProfile
+            if (!lastChange) {
+              return
+            }
 
-        if (message.read === false) {
-          initialUnreadMessages[message.lineUserId]++
-        }
+            lineUserId = lastChange.doc.id
+            lineUserProfile = lastChange.doc.data()
+            if (lastChange.type === 'added') {
+              if (vueModel.usersList && !vueModel.usersList[lineUserId]) {
+                const lastMessage = await vueModel.retrieveLastMessage(lineUserId)
+                /* 新的使用者傳入訊息 */
+                let newMessageInfo = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
+                vueModel.$set(vueModel.usersList, lineUserId, newMessageInfo)
+                vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
+              }
+            }
+          }
+        )
       },
 
-      composeMessageInfo (message) {
+      async composeMessageInfo (lineUserId, lineProfile, message, findUnreadUser = () => {}) {
+        const vueModel = this
+        const unreadMessagesQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
+          .collection('Message')
+          .where('read', '==', false)
+          .get()
+
+        const unreadMessagesCount = unreadMessagesQuerySnapshot.size
+        if (unreadMessagesCount > 0) {
+          findUnreadUser()
+        }
+
         return {
-          lineUserId: message.lineUserId,
-          lineUserName: message.lineUserName,
-          lineUserAvatar: message.lineUserAvatar,
-          text: message.text
+          lineUserId: lineUserId,
+          lineUserName: lineProfile.lineUserName,
+          lineUserAvatar: lineProfile.lineUserAvatar,
+          text: message.text,
+          updateTime: dayjs(message.updateTime.toDate()),
+          unreadMessagesCount: unreadMessagesCount,
+          unreadMessagesCountDesc: String(unreadMessagesCount)
         }
       },
 
-      summaryInitialUnreadMessages (initialUnreadMessages, usersList) {
+      entryChatRoom (messageInfo, lineUserId) {
         const vueModel = this
-        for (let lineUserId in usersList) {
-          let specificMessageInfo = usersList[lineUserId]
-          if (initialUnreadMessages.hasOwnProperty(lineUserId)) {
-            let unreadCount = initialUnreadMessages[lineUserId]
-            vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
-          } else {
-            let unreadCount = 0
-            vueModel.setUnreadMessages(specificMessageInfo, unreadCount)
-          }
-        }
-      },
-
-      setUnreadMessages (specificMessageInfo, unreadCount) {
-        specificMessageInfo.unreadMessages = {
-          count: unreadCount,
-          countDesc: String(unreadCount)
-        }
-      },
-
-      entryChatRoom (lineUserId) {
-        const vueModel = this
-        vueModel.$emit('retrieve-chat-messages', lineUserId)
+        vueModel.activatedLineUser = lineUserId
+        vueModel.$emit('route-chat-room', messageInfo, lineUserId)
       }
     }
   }

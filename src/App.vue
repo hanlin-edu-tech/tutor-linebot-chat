@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div>
     <mu-container>
       <router-view></router-view>
     </mu-container>
@@ -16,11 +16,6 @@
   }
 </script>
 
-
 <style lang="less" scoped>
-  .dialog {
-    padding: 20px;
-    width: 300px;
-    word-break: break-all;
-  }
+
 </style>

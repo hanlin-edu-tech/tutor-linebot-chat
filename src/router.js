@@ -10,19 +10,22 @@ export default new Router({
       component: () => import('./components/GoogleAuth.vue')
     },
     {
-      path: '/chat/chatRoom',
-      name: 'ChatRoom',
-      component: () => import('./components/chat/ChatRoom.vue')
-    },
-    {
-      path: '/chat/usersList',
-      name: 'UsersList',
-      component: () => import('./components/chat/ChatUsersList.vue')
+      path: '/reminder',
+      name: 'Reminder',
+      component: () => import('./components/Reminder.vue')
     },
     {
       path: '/chat/space',
-      name: 'Space',
-      component: () => import('./components/chat/ChatSpace.vue')
+      name: 'ChatSpace',
+      component: () => import('./components/chat/ChatSpace.vue'),
+      children: [
+        {
+          path: ':specificLineUser',
+          name: 'ChatRoom',
+          component: () => import('./components/chat/ChatRoom.vue'),
+          props: route => ({ ...route.params })
+        }
+      ]
     }
   ]
 })

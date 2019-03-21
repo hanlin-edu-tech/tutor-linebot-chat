@@ -8,12 +8,12 @@
                  :align-items="!messageInfo.ehanlin ? 'start' : 'end'">
           <mu-flex class="dialog-avatar" justify-content="start">
             <mu-avatar style="margin-right: 5px;" :size="37">
-              <img :src="!messageInfo.ehanlin ? messageInfo.lineUserAvatar : messageInfo.ehanlinAvatar">
+              <img :src="!messageInfo.ehanlin ? lineUserAvatar : messageInfo.ehanlinAvatar">
             </mu-avatar>
             <mu-flex direction="column" justify-content="start">
               <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
               <span class="dialog-text">
-                {{ !messageInfo.ehanlin ? messageInfo.lineUserName : messageInfo.ehanlinName }}
+                {{ !messageInfo.ehanlin ? lineUserName : messageInfo.ehanlinName }}
               </span>
             </mu-flex>
           </mu-flex>
@@ -52,7 +52,7 @@
                      @click="cancelImage"></mu-icon>
             <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
                      @click="sentImage"></mu-icon>
-            <mu-icon class="image-control-icon" size="27" value="image" @click="triggerUploadImage"></mu-icon>
+            <mu-icon class="image-control-icon" size="27" value="add_photo_alternate" @click="triggerUploadImage"></mu-icon>
           </mu-flex>
         </mu-row>
       </mu-container>
@@ -61,48 +61,50 @@
 </template>
 
 <script>
-  import { firebase, db, storage } from '../../modules/firebase-config'
+  import { db, firebase, storage } from '../../modules/firebase-config'
   import { mapState } from 'vuex'
   import { showModal } from '../../modules/modal'
   import dayjs from 'dayjs'
   import 'dayjs/locale/zh-tw'
+  import eventBus from '../../modules/event-bus'
 
   export default {
     name: 'ChatRoom',
     data () {
       return {
-        textColSpan: 11,
-        imageColSpan: 9,
-        lineUserName: '',
-        lineUserAvatar: '',
         messageText: '',
         messages: {},
         fourWeeksAgo: new Date(Date.now() - (604800000 * 4)),
-        storageRef: Object,
         isPreviewImage: false,
         isShowImageProgress: false,
-        originalImageUrl: '',
-        smallImageUrl: ''
+        originalImageUrl: ''
       }
     },
 
     props: {
-      lineUserId: ''
+      specificLineUser: String,
+      lineUserName: String,
+      lineUserAvatar: String,
     },
 
     computed: mapState('loginUser', ['loginUserInfo']),
 
-    watch: {
-      lineUserId (selectedLineUserId) {
-        const vueModel = this
-        vueModel.lineUserId = selectedLineUserId
+    mounted () {
+      const vueModel = this
+      try {
+        vueModel.storageRef = storage.ref('/images/')
+        vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
         vueModel.retrieveMessages()
+      } catch (error) {
+        console.error(error)
       }
     },
 
-    created () {
+    async beforeDestroy () {
       const vueModel = this
-      vueModel.storageRef = storage.ref('/images/')
+      if (vueModel.cancelListening && typeof vueModel.cancelListening === 'function') {
+        vueModel.cancelListening()
+      }
     },
 
     methods: {
@@ -117,50 +119,46 @@
 
       async retrieveMessages () {
         const vueModel = this
-        if (vueModel.lineUserId) {
-          const query = db.collection('Messages')
-            .where('lineUserId', '==', vueModel.lineUserId)
+        if (vueModel.specificLineUser) {
+          let messageQuerySnapshot = await vueModel.messageRef
             .where('updateTime', '>', vueModel.fourWeeksAgo)
             .orderBy('updateTime', 'asc')
             .limit(500)
+            .get()
 
-          let querySnapshot = await query.get()
           let messages = {}
-          querySnapshot.forEach(messageDoc => {
+          messageQuerySnapshot.forEach(messageDoc => {
             messages[messageDoc.id] = messageDoc.data()
           })
           vueModel.messages = messages
-          if (Object.keys(vueModel.messages).length > 0) {
-            let singleMessage = Object.values(vueModel.messages)[0]
-            vueModel.lineUserName = singleMessage.lineUserName
-            vueModel.lineUserAvatar = singleMessage.lineUserAvatar
-            vueModel.scrollBottom()
-          }
-          query.onSnapshot(vueModel.receivedNewMessage())
+          vueModel.listeningOnMessageAdded()
         }
       },
 
-      receivedNewMessage () {
+      listeningOnMessageAdded () {
         const vueModel = this
-        return querySnapshot => {
-          let lastMessageDoc
-          let lastChange = querySnapshot.docChanges().last()
-          if (!lastChange) {
-            return
-          }
-          lastMessageDoc = lastChange.doc
-          if (lastChange.type === 'added') {
-            const lastMessageId = lastMessageDoc.id
-            const lastMessage = lastMessageDoc.data()
-
-            vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
-            vueModel.$nextTick(vueModel.scrollBottom)
-
-            if (lastMessage.read === false) {
-              vueModel.updateMessagesToRead(vueModel.lineUserId)
+        vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
+          .where('updateTime', '>', vueModel.fourWeeksAgo)
+          .orderBy('updateTime', 'asc')
+          .onSnapshot(async messageQuerySnapshot => {
+            let lastMessageDoc
+            let lastChange = messageQuerySnapshot.docChanges().last()
+            if (!lastChange) {
+              return
             }
-          }
-        }
+
+            if (lastChange.type === 'added') {
+              lastMessageDoc = lastChange.doc
+              const lastMessageId = lastMessageDoc.id
+              const lastMessage = lastMessageDoc.data()
+
+              console.log(lastMessage)
+
+              vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
+              vueModel.$nextTick(vueModel.scrollBottom)
+              vueModel.updateMessagesToRead()
+            }
+          })
       },
 
       triggerUploadImage () {
@@ -193,6 +191,7 @@
               canvasWidth = img.width
               canvasHeight = img.height
             } else {
+              /* 縮小比例重新繪製圖片 */
               canvasWidth = (img.width > img.height) ? 240 : img.width / (img.height / 240)
               canvasHeight = (img.height > img.width) ? 240 : img.height / (img.width / 240)
             }
@@ -237,18 +236,17 @@
         vueModel.isPreviewImage = false
       },
 
-      async updateMessagesToRead (lineUserId) {
+      async updateMessagesToRead () {
         const vueModel = this
-        const query = db.collection('Messages')
-          .where('lineUserId', '==', lineUserId)
-          .where('read', '==', false)
+        let unreadMessages = await vueModel.$bindCollectionAsObject('unreadMessages',
+          vueModel.messageRef
+            .where('read', '==', false))
 
-        let unreadMessages = await vueModel.$bindCollectionAsObject('unreadMessages', query)
         let batch = db.batch()
         let readMessagesIds = Object.keys(unreadMessages)
         if (readMessagesIds.length > 0) {
           readMessagesIds.forEach(id => {
-            batch.update(db.collection('Messages').doc(id), { read: true })
+            batch.update(vueModel.messageRef.doc(id), { read: true })
           })
         }
 
@@ -294,9 +292,6 @@
         let updateTime = await firebase.firestore.Timestamp.fromDate(new Date())
         let loginUserInfo = vueModel.loginUserInfo
         let message = {
-          lineUserId: vueModel.lineUserId,
-          lineUserName: vueModel.lineUserName,
-          lineUserAvatar: vueModel.lineUserAvatar,
           text: messageText,
           updateTime: updateTime,
           read: true,
@@ -309,7 +304,7 @@
           message.imageUrl = originalImageUrl
         }
 
-        await db.collection('Messages').add(message)
+        await vueModel.messageRef.add(message)
       },
 
       async sentMessage (event) {
@@ -318,13 +313,13 @@
           return
         }
         event.preventDefault()
-        await vueModel.pushChatMessage(vueModel.lineUserId,
+        await vueModel.pushChatMessage(vueModel.specificLineUser,
           { messageText: vueModel.messageText })
       },
 
       async sentImage () {
         const vueModel = this
-        await vueModel.pushChatMessage(vueModel.lineUserId,
+        await vueModel.pushChatMessage(vueModel.specificLineUser,
           {
             originalImageUrl: vueModel.originalImageUrl,
             smallImageUrl: vueModel.smallImageUrl
