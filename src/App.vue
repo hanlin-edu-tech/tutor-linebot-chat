@@ -1,9 +1,7 @@
 <template>
-  <div>
-    <mu-container>
-      <router-view></router-view>
-    </mu-container>
-  </div>
+  <mu-container>
+    <router-view></router-view>
+  </mu-container>
 </template>
 
 <script>
@@ -15,7 +13,3 @@
     name: 'app',
   }
 </script>
-
-<style lang="less" scoped>
-
-</style>

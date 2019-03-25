@@ -1,5 +1,5 @@
 <template>
-  <div id="space" class="layout">
+  <section id="space" class="layout">
     <Layout>
       <Sider class="sider" :width="siderWidth" breakpoint="md"
              :collapsible="isCollapsible" :collapsed-width="0" v-model="isCollapsed">
@@ -12,13 +12,13 @@
         </Content>
       </Layout>
     </Layout>
-  </div>
+  </section>
 </template>
 
 <script>
-  import ChatUsersList from './ChatUsersList'
-  import ChatRoom from './ChatRoom'
-  import { db, auth } from '../../modules/firebase-config'
+  import ChatUsersList from '@/components/chat/ChatUsersList'
+  import ChatRoom from '@/components/chat/ChatRoom'
+  import { db, auth } from '@/modules/firebase-config'
   import { mapState } from 'vuex'
 
   export default {
@@ -54,6 +54,8 @@
         auth.signOut()
         vueModel.$router.replace(`/googleAuth`)
       }
+      document.querySelector('.ivu-layout-sider-zero-width-trigger').innerHTML =
+        '<span style="font-size: 15px;">收合</span>'
     },
 
     methods: {
@@ -80,7 +82,7 @@
         )
         await vueModel.delay(300)
         vueModel.$root.$emit('assign-line-user', lineUserId)
-      },
+      }
     }
   }
 </script>

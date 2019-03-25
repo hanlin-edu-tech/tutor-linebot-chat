@@ -20,6 +20,7 @@ Vue.use(VueFirestore, {
 Vue.component('Layout', Layout)
 Vue.component('Content', Content)
 Vue.component('Sider', Sider)
+Vue.component('Icon', Icon);
 Vue.prototype.$Modal = Modal
 
 new Vue({

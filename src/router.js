@@ -7,22 +7,22 @@ export default new Router({
     {
       path: '/googleAuth',
       name: 'GoogleAuth',
-      component: () => import('./components/GoogleAuth.vue')
+      component: () => import('@/views/GoogleAuth.vue')
     },
     {
       path: '/reminder',
       name: 'Reminder',
-      component: () => import('./components/Reminder.vue')
+      component: () => import('@/views/Reminder.vue')
     },
     {
       path: '/chat/space',
       name: 'ChatSpace',
-      component: () => import('./components/chat/ChatSpace.vue'),
+      component: () => import('@/views/ChatSpace.vue'),
       children: [
         {
           path: ':specificLineUser',
           name: 'ChatRoom',
-          component: () => import('./components/chat/ChatRoom.vue'),
+          component: () => import('@/components/chat/ChatRoom.vue'),
           props: route => ({ ...route.params })
         }
       ]

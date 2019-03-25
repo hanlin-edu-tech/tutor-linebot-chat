@@ -12,10 +12,10 @@
 </template>
 
 <script>
-  import { firebase, db, auth } from '../modules/firebase-config'
+  import { firebase, db, auth } from '@/modules/firebase-config'
   import 'firebase/auth'
   import { mapActions } from 'vuex'
-  import { showModal } from '../modules/modal'
+  import { showModal } from '@/modules/modal'
 
   export default {
     name: 'GoogleAuth',
