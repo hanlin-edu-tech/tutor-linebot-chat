@@ -41,7 +41,7 @@
           if (window.innerWidth < window.innerHeight) {
             return window.innerWidth
           } else {
-            return '280'
+            return '310'
           }
         }
       },

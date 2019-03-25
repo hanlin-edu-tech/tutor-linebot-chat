@@ -20,9 +20,13 @@
           <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
             <img class="chat-image" :src="messageInfo.imageUrl">
           </a>
+          <a v-show="messageInfo.fileUrl" :href="messageInfo.fileUrl" target="_blank">
+            <img class="chat-image"
+                 src="https://s3-ap-northeast-1.amazonaws.com/ehanlin-web-resource/linebot/file/file_icon.png">
+          </a>
           <article v-show="!messageInfo.imageUrl"
                    :class="!messageInfo.ehanlin ? 'dialog-block-user' : 'dialog-block-ehanlin'">
-            <template v-for="line in messageInfo.text.split('\n')">{{line}}<br></template>
+            <template v-for="line in messageInfo.text.split('\n')">{{line}}<br /></template>
           </article>
         </mu-flex>
       </mu-flex>
@@ -42,7 +46,8 @@
           <section style="width: 75%; min-height: 80px;" v-show="isPreviewImage">
             <mu-flex fill justify-content="start">
               <mu-circular-progress style="margin-top: 20px;" :size="36"
-                                    v-show="isShowImageProgress"></mu-circular-progress>
+                                    v-show="isShowImageProgress">
+              </mu-circular-progress>
               <img id="preview-image" class="chat-image-preview" :src="originalImageUrl">
             </mu-flex>
           </section>
@@ -52,7 +57,8 @@
                      @click="cancelImage"></mu-icon>
             <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
                      @click="sentImage"></mu-icon>
-            <mu-icon class="image-control-icon" size="27" value="add_photo_alternate" @click="triggerUploadImage"></mu-icon>
+            <mu-icon class="image-control-icon" size="27" value="add_photo_alternate"
+                     @click="triggerUploadImage"></mu-icon>
           </mu-flex>
         </mu-row>
       </mu-container>
@@ -66,7 +72,6 @@
   import { showModal } from '../../modules/modal'
   import dayjs from 'dayjs'
   import 'dayjs/locale/zh-tw'
-  import eventBus from '../../modules/event-bus'
 
   export default {
     name: 'ChatRoom',
@@ -151,8 +156,6 @@
               lastMessageDoc = lastChange.doc
               const lastMessageId = lastMessageDoc.id
               const lastMessage = lastMessageDoc.data()
-
-              console.log(lastMessage)
 
               vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
               vueModel.$nextTick(vueModel.scrollBottom)
@@ -289,7 +292,7 @@
           originalImageUrl = '',
         } = {}) {
         const vueModel = this
-        let updateTime = await firebase.firestore.Timestamp.fromDate(new Date())
+        let updateTime = firebase.firestore.Timestamp.fromDate(new Date())
         let loginUserInfo = vueModel.loginUserInfo
         let message = {
           text: messageText,
