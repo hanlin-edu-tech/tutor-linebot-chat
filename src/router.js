@@ -26,6 +26,11 @@ export default new Router({
           props: route => ({ ...route.params })
         }
       ]
+    },
+    {
+      path: '/admin',
+      name: 'Admin',
+      component: () => import('@/views/Admin.vue')
     }
   ]
 })
