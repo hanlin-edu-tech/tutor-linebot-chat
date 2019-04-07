@@ -2,18 +2,19 @@
   <section id="chat-room">
     <article id="dialog" ref="dialog">
       <mu-flex v-for="(messageInfo, id) in messages" :key="id"
-               :class="!messageInfo.ehanlin ? 'dialog-flex-left' : 'dialog-flex-right'"
-               :justify-content="!messageInfo.ehanlin ? 'start' : 'end'">
+               :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
+               :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
         <mu-flex class="dialog-row" direction="column"
-                 :align-items="!messageInfo.ehanlin ? 'start' : 'end'">
+                 :align-items="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
           <mu-flex class="dialog-avatar" justify-content="start">
             <mu-avatar style="margin-right: 5px;" :size="37">
-              <img :src="!messageInfo.ehanlin ? lineUserAvatar : messageInfo.ehanlinAvatar">
+              <img :src="!messageInfo.ehanlinCustomerService ?
+              lineUserAvatar : messageInfo.ehanlinCustomerService.avatar">
             </mu-avatar>
             <mu-flex direction="column" justify-content="start">
               <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
               <span class="dialog-text">
-                {{ !messageInfo.ehanlin ? lineUserName : messageInfo.ehanlinName }}
+                {{ !messageInfo.ehanlinCustomerService ? lineUserName : messageInfo.ehanlinCustomerService.name }}
               </span>
             </mu-flex>
           </mu-flex>
@@ -25,7 +26,8 @@
                  src="https://s3-ap-northeast-1.amazonaws.com/ehanlin-web-resource/linebot/file/file_icon.png">
           </a>
           <article v-show="!messageInfo.imageUrl"
-                   :class="!messageInfo.ehanlin ? 'dialog-block-user' : 'dialog-block-ehanlin'">
+                   :class="!messageInfo.ehanlinCustomerService ?
+                   'dialog-block-user' : 'dialog-block-ehanlin'">
             <template v-for="line in messageInfo.text.split('\n')">{{line}}<br /></template>
           </article>
         </mu-flex>
@@ -67,9 +69,9 @@
 </template>
 
 <script>
-  import { db, firebase, storage } from '../../modules/firebase-config'
+  import { db, firebase, storage } from '@/modules/firebase-config'
   import { mapState } from 'vuex'
-  import { showModal } from '../../modules/modal'
+  import { showModal } from '@/modules/modal'
   import dayjs from 'dayjs'
   import 'dayjs/locale/zh-tw'
 
@@ -145,6 +147,7 @@
         vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
           .where('updateTime', '>', vueModel.fourWeeksAgo)
           .orderBy('updateTime', 'asc')
+          .limit(1000)
           .onSnapshot(async messageQuerySnapshot => {
             let lastMessageDoc
             let lastChange = messageQuerySnapshot.docChanges().last()
@@ -298,9 +301,11 @@
           text: messageText,
           updateTime: updateTime,
           read: true,
-          ehanlin: loginUserInfo.email,
-          ehanlinName: loginUserInfo.name,
-          ehanlinAvatar: loginUserInfo.avatar
+          ehanlinCustomerService: {
+            account: loginUserInfo.email,
+            name: loginUserInfo.name,
+            avatar: loginUserInfo.avatar
+          }
         }
 
         if (originalImageUrl) {
@@ -338,7 +343,7 @@
     font-size: 13px;
 
     #dialog {
-      height: 75vh;
+      height: 78vh;
       overflow: scroll;
     }
 

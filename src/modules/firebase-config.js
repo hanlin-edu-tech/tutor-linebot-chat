@@ -4,13 +4,14 @@ import '@firebase/auth'
 import '@firebase/storage'
 
 const config = {
-  apiKey: "AIzaSyACd0utVIIjEO6voLC2NaGDL6RKHa1-0EA",
-  authDomain: "ehanlinlinebotchat.firebaseapp.com",
-  databaseURL: "https://ehanlinlinebotchat.firebaseio.com",
-  projectId: "ehanlinlinebotchat",
-  storageBucket: "ehanlinlinebotchat.appspot.com",
-  messagingSenderId: "21244896240"
+  apiKey: "AIzaSyBk-4Q04RLbZzzn2ml9KAUOEfVt6_eIcX4",
+  authDomain: "ehanlin-linebot-chat.firebaseapp.com",
+  databaseURL: "https://ehanlin-linebot-chat.firebaseio.com",
+  projectId: "ehanlin-linebot-chat",
+  storageBucket: "ehanlin-linebot-chat.appspot.com",
+  messagingSenderId: "394962262744"
 };
+
 firebase.initializeApp(config)
 
 const db = firebase.firestore()

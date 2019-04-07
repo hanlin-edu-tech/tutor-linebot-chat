@@ -18,7 +18,7 @@
 <script>
   import ChatUsersList from '@/components/chat/ChatUsersList'
   import ChatRoom from '@/components/chat/ChatRoom'
-  import { db, auth } from '@/modules/firebase-config'
+  import { auth } from '@/modules/firebase-config'
   import { mapState } from 'vuex'
 
   export default {
@@ -41,7 +41,7 @@
           if (window.innerWidth < window.innerHeight) {
             return window.innerWidth
           } else {
-            return '310'
+            return '315'
           }
         }
       },
@@ -69,6 +69,8 @@
         const vueModel = this
         vueModel.$router.replace({ path: `/chat/space/` })
 
+        console.log(lineUserId)
+
         await vueModel.delay(300)
         vueModel.$router.replace(
           {
@@ -80,7 +82,11 @@
             }
           }
         )
-        await vueModel.delay(300)
+
+        if (window.innerWidth < 500) {
+          vueModel.isCollapsed = true
+        }
+
         vueModel.$root.$emit('assign-line-user', lineUserId)
       }
     }
@@ -94,7 +100,7 @@
     }
 
     .content {
-      margin: 20px;
+      margin: 10px 5px;
       background: #fff;
       /*min-height: 90vh;*/
     }

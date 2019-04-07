@@ -2,72 +2,84 @@
   <section id="users-list">
     <mu-list textline="two-line">
       <mu-sub-header class="date-header-font">{{ today }}</mu-sub-header>
+      <div class="search-line-user">
+        <SearchLineUser :on-searched-fn="showSearchedUser"></SearchLineUser>
+      </div>
       <mu-flex justify-content="center">
         <mu-circular-progress v-if="isLoading"
                               color="success" :stroke-width="7" :size="56"></mu-circular-progress>
       </mu-flex>
       <!-- ehanlin linebot 有對話之使用者列表 -->
-      <mu-list-item
-        avatar v-for="(messageInfo, lineUserId) in usersList" :key="lineUserId">
-        <mu-list-item-action>
-          <mu-avatar :size="55">
-            <img :src="messageInfo.lineUserAvatar">
-          </mu-avatar>
-        </mu-list-item-action>
-        <mu-ripple class="ripple-entry"
-                   v-show="!isShowEdit(lineUserId)" @click="entryChatRoom(messageInfo, lineUserId)">
-          <mu-list-item-content>
-            <mu-list-item-title class="line-user-name">
-              {{ messageInfo.lineUserName }}
-            </mu-list-item-title>
-            <mu-list-item-sub-title>
-              <span :class="messageInfo.studentCard? 'student-card' : ''">
-                {{ messageInfo.studentCard }}
+      <article>
+        <mu-list-item
+          avatar v-for="(messageInfo, lineUserId) in showUsers" :key="lineUserId">
+          <mu-list-item-action>
+            <mu-avatar :size="55">
+              <img :src="messageInfo.lineUserAvatar">
+            </mu-avatar>
+          </mu-list-item-action>
+          <mu-ripple class="ripple-entry"
+                     v-show="!isShowEdit(lineUserId)" @click="entryChatRoom(messageInfo, lineUserId)">
+            <mu-list-item-content>
+              <mu-list-item-title class="line-user-name">
+                {{ messageInfo.lineUserName }}
+              </mu-list-item-title>
+              <mu-list-item-sub-title>
+              <span v-show="retrieveIdentity(lineUserId)" class="identity">
+                {{ retrieveIdentity(lineUserId) }}
               </span>
-            </mu-list-item-sub-title>
-            <mu-list-item-sub-title>
-              <span style="font-size: 12px">{{ messageInfo.text }}</span>
-            </mu-list-item-sub-title>
-            <mu-divider></mu-divider>
-          </mu-list-item-content>
-        </mu-ripple>
-        <mu-flex justify-content="between" align-items="center">
-          <template v-if="isShowEdit(lineUserId)">
-            <mu-text-field :ref="lineUserId" class="edit-student-card" type="text"
-                           v-model="messageInfo.studentCard"
-                           placeholder="請輸入學號"></mu-text-field>
-            <mu-flex align-content="center">
-              <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
-              <mu-icon size="22" value="save" @click="saveStudentCard(messageInfo, lineUserId)"></mu-icon>
-            </mu-flex>
-          </template>
-          <template v-else>
-            <mu-icon class="icon-style" size="22" value="edit" color="saddlebrown"
-                     @click="editStudentCard(lineUserId)"></mu-icon>
-          </template>
-        </mu-flex>
-        <mu-badge v-if="messageInfo.unreadMessagesCount > 0 && !isShowEdit(lineUserId)"
-                  :content="messageInfo.unreadMessagesCountDesc"
-                  color="#9966ff" badge-class="badge-info"></mu-badge>
-      </mu-list-item>
+              </mu-list-item-sub-title>
+              <mu-list-item-sub-title>
+                <span style="font-size: 12px">{{ messageInfo.text }}</span>
+              </mu-list-item-sub-title>
+              <mu-divider></mu-divider>
+            </mu-list-item-content>
+          </mu-ripple>
+          <mu-flex justify-content="between" align-items="center">
+            <template v-if="isShowEdit(lineUserId)">
+              <mu-text-field :ref="lineUserId" class="edit-identity" type="text"
+                             v-model="identity"
+                             placeholder="請輸入唯一識別名稱"></mu-text-field>
+              <mu-flex align-content="center">
+                <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
+                <mu-icon size="22" value="save" @click="saveIdentity(lineUserId)"></mu-icon>
+              </mu-flex>
+            </template>
+            <template v-else>
+              <mu-icon class="icon-style" size="22" value="edit" color="saddlebrown"
+                       @click="editIdentity(lineUserId)"></mu-icon>
+            </template>
+          </mu-flex>
+          <mu-badge v-if="messageInfo.unreadMessagesCount > 0 && !isShowEdit(lineUserId)"
+                    :content="messageInfo.unreadMessagesCountDesc"
+                    color="#9966ff" badge-class="badge-info"></mu-badge>
+        </mu-list-item>
+      </article>
     </mu-list>
   </section>
 </template>
 <script>
-  import { db, firebase } from '../../modules/firebase-config'
+  import SearchLineUser from '@/components/SearchLineUser'
+  import { db, firebase } from '@/modules/firebase-config'
+
   import dayjs from 'dayjs'
   import 'dayjs/locale/zh-tw'
 
   export default {
     name: 'ChatUsersList',
-    data: () => {
+    components: {
+      SearchLineUser
+    },
+    data () {
       return {
         isLoading: true,
+        isShowUsers: true,
+        identity: '',
         messages: [],
-        usersList: {},
-        studentCard: '',
+        showUsers: {},
+        identities: [],
         chatRef: db.collection('Chat'),
-        studentCardRef: db.collection('StudentCard'),
+        identityCardRef: db.collection('Identity'),
       }
     },
     computed: {
@@ -98,9 +110,11 @@
     methods: {
       async retrieveChatDocs () {
         const vueModel = this
-        const fourWeeksAgo = new Date(Date.now() - (604800000 * 4))
+        const threeWeeksAgo = new Date(Date.now() - (604800000 * 4))
         const chatQuerySnapshot = await vueModel.chatRef
-          .where('createTime', '>', fourWeeksAgo)
+          .where('updateTime', '>', threeWeeksAgo)
+          .orderBy('updateTime', 'desc')
+          .limit(300)
           .get()
 
         return chatQuerySnapshot
@@ -123,45 +137,53 @@
         return messageDocs.last().data()
       },
 
-      async retrieveStudentCard (usersList) {
+      async mappingLineUserIdentity () {
         const vueModel = this
-        const studentCardRef = db.collection('StudentCard')
-        const studentCardQuerySnapshot = await studentCardRef.get()
+        const identityRef = db.collection('Identity')
+        const identityQuerySnapshot = await identityRef.get()
+        const identityMapping = new Map()
 
-        studentCardQuerySnapshot.forEach(studentCardDoc => {
-          let lineUserId = studentCardDoc.id
-          let messageInfo = usersList[lineUserId]
-          let studentCardInfo = studentCardDoc.data()
-          console.log(studentCardInfo)
-          messageInfo.studentCard = studentCardInfo.studentCard
+        identityQuerySnapshot.forEach(identityDoc => {
+          let lineUserId = identityDoc.id
+          let identityInfo = identityDoc.data()
+          identityMapping.set(lineUserId, identityInfo.identity)
         })
+        vueModel.identityMapping = identityMapping
 
-        studentCardRef.onSnapshot(studentCardQuerySnapshot => {
-          let lastChange = studentCardQuerySnapshot.docChanges().last()
-          let lineUserId, studentCardInfo
+        identityRef.onSnapshot(identityQuerySnapshot => {
+          const identityMapping = vueModel.identityMapping
+          const lastChange = identityQuerySnapshot.docChanges().last()
+
+          let lineUserId, identityInfo
           if (!lastChange) {
             return
           }
 
           lineUserId = lastChange.doc.id
-          studentCardInfo = lastChange.doc.data()
+          identityInfo = lastChange.doc.data()
           if (lastChange.type === 'added' || lastChange.type === 'modified') {
-            if (vueModel.usersList && vueModel.usersList[lineUserId]) {
-              vueModel.usersList[lineUserId].studentCard = studentCardInfo.studentCard
-            }
+            identityMapping.set(lineUserId, identityInfo.identity)
+            vueModel.identityMapping = identityMapping
           }
         })
+      },
+
+      retrieveIdentity (lineUserId) {
+        const vueModel = this
+        return vueModel.identityMapping.get(lineUserId)
       },
 
       async initialUsersList (chatDocs) {
         const vueModel = this
         const allUsers = {}
         const unreadUsers = {}
-        let usersList = {}
+        let showUsers = {}
         for (let chatDoc of chatDocs) {
           const lineUserId = chatDoc.id
           const lineUserProfile = chatDoc.data()
           const lastMessage = await vueModel.retrieveLastMessage(lineUserId)
+
+          /* 分離有未讀訊息之使用者 */
           const findUnreadUser = () => {
             unreadUsers[lineUserId] = {}
           }
@@ -169,10 +191,10 @@
           allUsers[lineUserId] = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage, findUnreadUser)
           vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
         }
-        /* 讓有未讀訊息之 lineUserId 保持在物件中的前方 */
-        usersList = { ...unreadUsers, ...allUsers }
-        await vueModel.retrieveStudentCard(usersList)
-        vueModel.usersList = usersList
+        /* 合併訊息，並讓有未讀訊息之 lineUserId 保持在物件中的前方 */
+        showUsers = { ...unreadUsers, ...allUsers }
+        await vueModel.mappingLineUserIdentity()
+        vueModel.showUsers = showUsers
         vueModel.isLoading = false
       },
 
@@ -196,49 +218,51 @@
           updateTime: dayjs(message.updateTime.toDate()),
           unreadMessagesCount: unreadMessagesCount,
           unreadMessagesCountDesc: String(unreadMessagesCount),
-          isEditStudentCard: false
+          isEditIdentity: false
         }
       },
 
-      listeningOnMessageAdded (lineUserId, lineUserProfile) {
+      listeningOnMessageAdded (lineUserId, lineUserProfile,
+                               onFireSearchedUser = () => {}) {
         const vueModel = this
         db.collection(`Chat/${lineUserId}/Message`)
-          .onSnapshot(vueModel.messageFire(lineUserId, lineUserProfile))
+          .onSnapshot(vueModel.messageFire(lineUserId, lineUserProfile, onFireSearchedUser))
       },
 
-      messageFire (lineUserId, lineUserProfile) {
+      messageFire (lineUserId, lineUserProfile, onFiredSearchedUser) {
         const vueModel = this
         return async messageQuerySnapshot => {
-          let lastMessage
-          let lastChange = messageQuerySnapshot.docChanges().last()
-          if (!lastChange) {
+          let onFiredLastMessage
+          let messageLastChange = messageQuerySnapshot.docChanges().last()
+          if (!messageLastChange) {
             return
           }
 
-          lastMessage = lastChange.doc.data()
-          if (lastChange.type === 'added') {
-            if (vueModel.usersList && vueModel.usersList[lineUserId]) {
-              let existedSpecificMessageInfo = vueModel.usersList[lineUserId]
-              let lastUpdateTime = lastMessage.updateTime.toDate()
-              /* 如果現存訊息的時戳比最後一則訊息早，表示 lastMessage 為新增的訊息 */
+          onFiredLastMessage = messageLastChange.doc.data()
+          if (messageLastChange.type === 'added') {
+            if (vueModel.showUsers && vueModel.showUsers[lineUserId]) {
+              let existedSpecificMessageInfo = vueModel.showUsers[lineUserId]
+              let lastUpdateTime = onFiredLastMessage.updateTime.toDate()
+              /* 如果現存訊息的時戳比 lastMessage 早，表示 lastMessage 為新增的訊息 */
               if (existedSpecificMessageInfo.updateTime.isBefore(dayjs(lastUpdateTime))) {
                 /* 重新取代為新訊息 */
-                vueModel.usersList[lineUserId] =
-                  await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
+                vueModel.showUsers[lineUserId] =
+                  await vueModel.composeMessageInfo(lineUserId, lineUserProfile, onFiredLastMessage)
 
-                if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
-                  let newUserMessageInfo = {}
-                  newUserMessageInfo[lineUserId] = {}
-                  vueModel.usersList = { ...newUserMessageInfo, ...vueModel.usersList }
-                }
+                // if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
+                //   let newUserMessageInfo = {}
+                //   newUserMessageInfo[lineUserId] = {}
+                //   vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
+                // }
               }
             }
-          } else if (lastChange.type === 'modified') {
+          } else if (messageLastChange.type === 'modified') {
             /* 當訊息更新為已讀狀態，才會觸發 */
             let unreadMessagesCount = 0
-            vueModel.usersList[lineUserId].unreadMessagesCount = unreadMessagesCount
-            vueModel.usersList[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
+            vueModel.showUsers[lineUserId].unreadMessagesCount = unreadMessagesCount
+            vueModel.showUsers[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
           }
+          await onFiredSearchedUser(lineUserId, lineUserProfile, onFiredLastMessage)
         }
       },
 
@@ -246,20 +270,20 @@
         const vueModel = this
         vueModel.chatRef.onSnapshot(
           async chatQuerySnapshot => {
-            let lastChange = chatQuerySnapshot.docChanges().last()
+            let chatLastChange = chatQuerySnapshot.docChanges().last()
             let lineUserId, lineUserProfile
-            if (!lastChange) {
+            if (!chatLastChange) {
               return
             }
 
-            lineUserId = lastChange.doc.id
-            lineUserProfile = lastChange.doc.data()
-            if (lastChange.type === 'added') {
-              if (vueModel.usersList && !vueModel.usersList[lineUserId]) {
+            lineUserId = chatLastChange.doc.id
+            lineUserProfile = chatLastChange.doc.data()
+            if (chatLastChange.type === 'added') {
+              if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
                 const lastMessage = await vueModel.retrieveLastMessage(lineUserId)
                 /* 新的使用者傳入訊息 */
                 let newMessageInfo = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
-                vueModel.$set(vueModel.usersList, lineUserId, newMessageInfo)
+                vueModel.$set(vueModel.showUsers, lineUserId, newMessageInfo)
                 vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
               }
             }
@@ -275,37 +299,32 @@
 
       isShowEdit (lineUserId) {
         const vueModel = this
-        return vueModel.usersList[lineUserId].isEditStudentCard
+        return vueModel.showUsers[lineUserId].isEditIdentity
       },
 
       cancelEdit (lineUserId) {
         const vueModel = this
-        vueModel.usersList[lineUserId].isEditStudentCard = false
+        vueModel.showUsers[lineUserId].isEditIdentity = false
       },
 
-      isShowStudentCard (messageInfo) {
-        console.log(messageInfo)
-        return messageInfo.studentCard ? messageInfo.studentCard : ''
-      },
-
-      editStudentCard (lineUserId) {
+      editIdentity (lineUserId) {
         const vueModel = this
-        vueModel.usersList[lineUserId].isEditStudentCard = true
+        vueModel.showUsers[lineUserId].isEditIdentity = true
       },
 
-      async saveStudentCard (messageInfo, lineUserId) {
+      async saveIdentity (lineUserId) {
         const vueModel = this
         const now = firebase.firestore.Timestamp.fromDate(new Date())
-        const studentCardDocRef = vueModel.studentCardRef.doc(lineUserId)
-        const studentCardDoc = studentCardDocRef.get()
-        if (studentCardDoc.exists) {
-          await studentCardDocRef.set({
-            studentCard: messageInfo.studentCard,
+        const identityDocRef = vueModel.identityCardRef.doc(lineUserId)
+        const identityDoc = identityDocRef.get()
+        if (identityDoc.exists) {
+          await identityDocRef.set({
+            identity: vueModel.identity,
             updateTime: now
           }, { merge: true })
         } else {
-          await studentCardDocRef.set({
-            studentCard: messageInfo.studentCard,
+          await identityDocRef.set({
+            identity: vueModel.identity,
             createTime: now,
             updateTime: now
           })
@@ -313,18 +332,56 @@
 
         // toDo error
         vueModel.cancelEdit(lineUserId)
+      },
+
+      async showSearchedUser (lineUserId) {
+        const vueModel = this
+        const chatDocSnapshot = await db.collection('Chat').doc(lineUserId).get()
+        const searchedUserProfile = chatDocSnapshot.data()
+        const searchedUserLastMessage = await vueModel.retrieveLastMessage(lineUserId)
+        let searchedUserMessageInfo
+
+        vueModel.searchedUser = {}
+        searchedUserMessageInfo = await vueModel.composeMessageInfo(lineUserId, searchedUserProfile, searchedUserLastMessage)
+        vueModel.$set(vueModel.searchedUser, lineUserId, searchedUserMessageInfo)
+
+        /* 如果搜尋的使用者並未在 showUsers 中，則需要重新綁定該 Message 資料變化之事件 */
+        if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
+          vueModel.listeningOnMessageAdded(lineUserId, searchedUserProfile,
+            async (lineUserId, searchedUserProfile, searchedUserMessageLastChange) => {
+              const searchedUserOnFiredLastMessage = searchedUserMessageLastChange.doc.data()
+              if (searchedUserLastMessage.type === 'added') {
+                let existedSpecificMessageInfo = vueModel.searchedUser[lineUserId]
+                let lastUpdateTime = searchedUserOnFiredLastMessage.updateTime.toDate()
+                if (existedSpecificMessageInfo.updateTime.isBefore(dayjs(lastUpdateTime))) {
+                  vueModel.searchedUser[lineUserId] =
+                    await vueModel.composeMessageInfo(lineUserId, searchedUserProfile, searchedUserOnFiredLastMessage)
+                } else if (searchedUserLastMessage.type === 'modified') {
+                  let unreadMessagesCount = 0
+                  vueModel.searchedUser[lineUserId].unreadMessagesCount = unreadMessagesCount
+                  vueModel.searchedUser[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
+                }
+              }
+            }
+          )
+        }
+
+        vueModel.originalShowUsers = vueModel.showUsers
+        vueModel.showUsers = vueModel.searchedUser
       }
-    }
+    },
+
   }
 </script>
 <style lang="less">
   #users-list {
     background-color: #fdfbf2;
+    margin-left: -12px;
     height: 95vh;
     overflow: scroll;
 
     .mu-ripple-wrapper {
-      width: 77%;
+      width: 80%;
     }
 
     .date-header-font {
@@ -352,7 +409,7 @@
       color: #494949;
     }
 
-    .student-card {
+    .identity {
       font-weight: 500;
       color: #f1fbfb;
       background-color: teal;
@@ -361,19 +418,25 @@
     }
 
     .icon-style {
-      margin-left: 5px;
+      margin-left: 3px;
       cursor: pointer;
     }
 
     .badge-info {
-      margin-left: 7px;
+      margin-left: 5px;
       font-size: 13px;
     }
 
-    .edit-student-card {
+    .edit-identity {
       margin-bottom: 0;
-      margin-left: 3px;
+      margin-left: 5px;
       width: 72%;
+    }
+
+    .search-line-user {
+      margin-left: 25px;
+      width: 270px;
+      margin-bottom: -15px;
     }
   }
 </style>
