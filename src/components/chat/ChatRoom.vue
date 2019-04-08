@@ -72,8 +72,6 @@
   import { db, firebase, storage } from '@/modules/firebase-config'
   import { mapState } from 'vuex'
   import { showModal } from '@/modules/modal'
-  import dayjs from 'dayjs'
-  import 'dayjs/locale/zh-tw'
 
   export default {
     name: 'ChatRoom',
@@ -81,7 +79,6 @@
       return {
         messageText: '',
         messages: {},
-        fourWeeksAgo: new Date(Date.now() - (604800000 * 4)),
         isPreviewImage: false,
         isShowImageProgress: false,
         originalImageUrl: ''
@@ -116,7 +113,8 @@
 
     methods: {
       formatUpdateTime (updateTime) {
-        return dayjs(updateTime.toDate()).format('YYYY-MM-DD HH:mm:ss')
+        const vueModel = this
+        return vueModel.$dayjs(updateTime.toDate()).format('YYYY-MM-DD HH:mm:ss')
       },
 
       scrollBottom () {
@@ -128,7 +126,7 @@
         const vueModel = this
         if (vueModel.specificLineUser) {
           let messageQuerySnapshot = await vueModel.messageRef
-            .where('updateTime', '>', vueModel.fourWeeksAgo)
+            .where('updateTime', '>', vueModel.oneMonthAgo)
             .orderBy('updateTime', 'asc')
             .limit(500)
             .get()
@@ -144,8 +142,9 @@
 
       listeningOnMessageAdded () {
         const vueModel = this
+        const oneMonthAgo = vueModel.$dayjs().subtract(1, 'month').toDate()
         vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
-          .where('updateTime', '>', vueModel.fourWeeksAgo)
+          .where('updateTime', '>', oneMonthAgo)
           .orderBy('updateTime', 'asc')
           .limit(1000)
           .onSnapshot(async messageQuerySnapshot => {

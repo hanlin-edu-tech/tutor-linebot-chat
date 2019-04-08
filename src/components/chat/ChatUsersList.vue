@@ -3,7 +3,7 @@
     <mu-list textline="two-line">
       <mu-sub-header class="date-header-font">{{ today }}</mu-sub-header>
       <div class="search-line-user">
-        <SearchLineUser :on-searched-fn="showSearchedUser"></SearchLineUser>
+        <SearchLineUser :on-searched-fn="showSearchedUser" :on-cancel-fn="returnToOriginalShowUsers"></SearchLineUser>
       </div>
       <mu-flex justify-content="center">
         <mu-circular-progress v-if="isLoading"
@@ -40,6 +40,7 @@
               <mu-text-field :ref="lineUserId" class="edit-identity" type="text"
                              v-model="identity"
                              placeholder="請輸入唯一識別名稱"></mu-text-field>
+
               <mu-flex align-content="center">
                 <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
                 <mu-icon size="22" value="save" @click="saveIdentity(lineUserId)"></mu-icon>
@@ -61,9 +62,7 @@
 <script>
   import SearchLineUser from '@/components/SearchLineUser'
   import { db, firebase } from '@/modules/firebase-config'
-
-  import dayjs from 'dayjs'
-  import 'dayjs/locale/zh-tw'
+  import { showModal } from '@/modules/modal'
 
   export default {
     name: 'ChatUsersList',
@@ -84,20 +83,13 @@
     },
     computed: {
       today () {
-        return dayjs().locale('zh-tw').format('YYYY-MM-DD dddd')
+        const vueModel = this
+        return vueModel.$dayjs().format('YYYY-MM-DD dddd')
       }
     },
 
     async mounted () {
       const vueModel = this
-      firebase.auth().onAuthStateChanged(function (user) {
-        if (user) {
-          //console.log(user)
-        } else {
-          // No user is signed in.
-        }
-      })
-
       try {
         const chatDocs = await vueModel.retrieveChatDocs()
         await vueModel.initialUsersList(chatDocs)
@@ -110,9 +102,10 @@
     methods: {
       async retrieveChatDocs () {
         const vueModel = this
-        const threeWeeksAgo = new Date(Date.now() - (604800000 * 4))
+        const oneMonthAgo = vueModel.$dayjs().subtract(1, 'month').toDate()
         const chatQuerySnapshot = await vueModel.chatRef
-          .where('updateTime', '>', threeWeeksAgo)
+          .where('updateTime', '>=', oneMonthAgo)
+          //.where('updateTime', '==', new Date('2019/04/07'))
           .orderBy('updateTime', 'desc')
           .limit(300)
           .get()
@@ -215,7 +208,7 @@
           lineUserName: lineProfile.lineUserName,
           lineUserAvatar: lineProfile.lineUserAvatar,
           text: message.text,
-          updateTime: dayjs(message.updateTime.toDate()),
+          updateTime: vueModel.$dayjs(message.updateTime.toDate()),
           unreadMessagesCount: unreadMessagesCount,
           unreadMessagesCountDesc: String(unreadMessagesCount),
           isEditIdentity: false
@@ -244,16 +237,17 @@
               let existedSpecificMessageInfo = vueModel.showUsers[lineUserId]
               let lastUpdateTime = onFiredLastMessage.updateTime.toDate()
               /* 如果現存訊息的時戳比 lastMessage 早，表示 lastMessage 為新增的訊息 */
-              if (existedSpecificMessageInfo.updateTime.isBefore(dayjs(lastUpdateTime))) {
+              if (existedSpecificMessageInfo.updateTime.isBefore(vueModel.$dayjs(lastUpdateTime))) {
                 /* 重新取代為新訊息 */
                 vueModel.showUsers[lineUserId] =
                   await vueModel.composeMessageInfo(lineUserId, lineUserProfile, onFiredLastMessage)
 
-                // if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
-                //   let newUserMessageInfo = {}
-                //   newUserMessageInfo[lineUserId] = {}
-                //   vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
-                // }
+                /* 如果新進訊息之 line user 並非當前對話之對象，則將此新訊息之 line user，排列至使用者列表上方 */
+                if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
+                  let newUserMessageInfo = {}
+                  newUserMessageInfo[lineUserId] = {}
+                  vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
+                }
               }
             }
           } else if (messageLastChange.type === 'modified') {
@@ -315,8 +309,19 @@
       async saveIdentity (lineUserId) {
         const vueModel = this
         const now = firebase.firestore.Timestamp.fromDate(new Date())
-        const identityDocRef = vueModel.identityCardRef.doc(lineUserId)
-        const identityDoc = identityDocRef.get()
+        let identityQuerySnapshot, identityDocRef, identityDoc
+
+        identityQuerySnapshot = await vueModel.identityCardRef
+          .where('identity', '==', vueModel.identity)
+          .get()
+
+        if (!identityQuerySnapshot.empty) {
+          showModal(vueModel, '唯一識別已存在於其他使用者')
+          return
+        }
+
+        identityDocRef = vueModel.identityCardRef.doc(lineUserId)
+        identityDoc = identityDocRef.get()
         if (identityDoc.exists) {
           await identityDocRef.set({
             identity: vueModel.identity,
@@ -330,13 +335,14 @@
           })
         }
 
-        // toDo error
         vueModel.cancelEdit(lineUserId)
       },
 
       async showSearchedUser (lineUserId) {
         const vueModel = this
-        const chatDocSnapshot = await db.collection('Chat').doc(lineUserId).get()
+        const chatDocSnapshot = await db.collection('Chat')
+          .doc(lineUserId)
+          .get()
         const searchedUserProfile = chatDocSnapshot.data()
         const searchedUserLastMessage = await vueModel.retrieveLastMessage(lineUserId)
         let searchedUserMessageInfo
@@ -353,7 +359,7 @@
               if (searchedUserLastMessage.type === 'added') {
                 let existedSpecificMessageInfo = vueModel.searchedUser[lineUserId]
                 let lastUpdateTime = searchedUserOnFiredLastMessage.updateTime.toDate()
-                if (existedSpecificMessageInfo.updateTime.isBefore(dayjs(lastUpdateTime))) {
+                if (existedSpecificMessageInfo.updateTime.isBefore(vueModel.$dayjs(lastUpdateTime))) {
                   vueModel.searchedUser[lineUserId] =
                     await vueModel.composeMessageInfo(lineUserId, searchedUserProfile, searchedUserOnFiredLastMessage)
                 } else if (searchedUserLastMessage.type === 'modified') {
@@ -368,6 +374,11 @@
 
         vueModel.originalShowUsers = vueModel.showUsers
         vueModel.showUsers = vueModel.searchedUser
+      },
+
+      returnToOriginalShowUsers () {
+        const vueModel = this
+        vueModel.showUsers = vueModel.originalShowUsers
       }
     },
 
