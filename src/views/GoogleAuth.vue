@@ -5,7 +5,7 @@
     </mu-flex>
     <mu-flex justify-content="center">
       <mu-button large color="primary" @click="authenticate">
-        以 Google 帳號登入
+        以 ehanlin 帳號登入
       </mu-button>
     </mu-flex>
   </section>
@@ -34,8 +34,6 @@
           try {
             let provider = new firebase.auth.GoogleAuthProvider()
             let loginResult = await auth.signInWithPopup(provider)
-            console.log(loginResult)
-            let querySnapshot = await db.collection('AuthorizedUsers').get()
             let user = loginResult.user
             vueModel.assignLoginUserInfoAction({
               email: user.email,
@@ -44,7 +42,7 @@
             })
             vueModel.$router.push(`/chat/space`)
           } catch (error) {
-            showModal(vueModel, '使用者沒有權限')
+            showModal(vueModel, vueModel.warningText)
             auth.signOut()
           }
         },
@@ -53,7 +51,6 @@
           const vueModel = this
           let querySnapshot = await db.collection('AuthorizedUsers').get()
           if (!querySnapshot) {
-            console.log('使用者沒有權限')
             auth.signOut()
             return
           }
@@ -72,7 +69,7 @@
               })
               vueModel.$router.push(`/chat/space`)
             } else {
-              showModal(vueModel, '使用者沒有權限')
+              showModal(vueModel, vueModel.warningText)
             }
           }
         }
