@@ -1,41 +1,63 @@
 <template>
-  <section style="width: 80vw">
+  <section id="linebot-chat-admin" style="width: 80vw">
     <mu-container>
+      <mu-row gutter>
+        <mu-col span="3">
+          <mu-date-input label="起始日期" v-model="startDate" full-width landscape></mu-date-input>
+        </mu-col>
+        <mu-col span="3">
+          <mu-date-input label="截止日期" v-model="expiryDate" full-width landscape></mu-date-input>
+        </mu-col>
+        <mu-col span="6">
+          <SearchLineUser :on-searched-fn="retrieveSpecificUserProfile"></SearchLineUser>
+        </mu-col>
+      </mu-row>
       <mu-row>
         <mu-col span="12">
-          <SearchLineUser :on-searched-fn="retrieveSpecificUserProfile"></SearchLineUser>
           <vue-good-table v-show="isShowSearchResult"
-                          :columns="messagesInfo" :rows="messages"
+                          :columns="headerInfo" :rows="messages"
                           :search-options="searchOptions"
-                          :pagination-options="paginationOptions">
+                          :pagination-options="paginationOptions"
+                          styleClass="vgt-table condensed">
+            <template slot="table-row" slot-scope="props">
+              <div v-if="props.row['ehanlin'] === true" style="color: #004ec4; font-weight: 500">
+                {{ props.row[props.column.field] }}
+              </div>
+              <div v-else>
+                {{ props.row[props.column.field] }}
+              </div>
+            </template>
           </vue-good-table>
         </mu-col>
       </mu-row>
-
     </mu-container>
   </section>
 </template>
 
 <script>
-  // import { VueGoodTable } from 'vue-good-table'
   import SearchLineUser from '@/components/SearchLineUser'
   import { db } from '@/modules/firebase-config'
 
   export default {
     name: 'Admin',
     data () {
+      const vueModel = this
       return {
-        lineUserName: '',
+        startDate: vueModel.$dayjs().format('YYYY-MM-DD'),
+        expiryDate: vueModel.$dayjs().format('YYYY-MM-DD'),
         isShowSearchResult: false,
         messages: [],
-        messagesInfo: [
+        headerInfo: [
           {
             label: '對象',
-            field: 'name'
+            field: 'name',
+            width: '20vw',
+            thClass: 'table-header'
           },
           {
             label: '訊息',
-            field: 'text'
+            field: 'text',
+            thClass: 'table-header'
           }
         ],
         searchOptions: {
@@ -71,17 +93,16 @@
         const searchedUserProfile = chatDocSnapshot.data()
         vueModel.lineUserName = searchedUserProfile.lineUserName
 
-        console.log(lineUserId)
         await vueModel.retrieveMessages(lineUserId)
         vueModel.isShowSearchResult = true
       },
 
       async retrieveMessages (lineUserId) {
         const vueModel = this
-        const halfYearsAgo = new Date(Date.now() - (604800000 * 24))
         const messageQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
           .collection('Message')
-          .where('updateTime', '>', halfYearsAgo)
+          .where('updateTime', '>=', vueModel.$dayjs(vueModel.startDate).startOf('day').toDate())
+          .where('updateTime', '<=', vueModel.$dayjs(vueModel.expiryDate).endOf('day').toDate())
           .orderBy('updateTime', 'desc')
           .limit(1500)
           .get()
@@ -89,18 +110,54 @@
         let messages = []
         messageQuerySnapshot.forEach(messageDoc => {
           const message = messageDoc.data()
-          messages.push({
+          const messageInfo = {
             name: message.ehanlinCustomerService ?
               message.ehanlinCustomerService.name : vueModel.lineUserName,
             text: message.text
-          })
+          }
+
+          if (message.ehanlinCustomerService) {
+            messageInfo['ehanlin'] = true
+          }
+          messages.push(messageInfo)
         })
         vueModel.messages = messages
-      },
+      }
     },
   }
 </script>
 
-<style scoped>
+<style lang="less">
+  @import '../static/less/modal.less';
 
+  #linebot-chat-admin {
+    .mu-input-label {
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .table-header {
+      background: white;
+      font-weight: 900;
+    }
+
+    .vgt-global-search {
+      background: #002e6f78;
+    }
+
+    .vgt-wrap__footer {
+      color: #45464a;
+      padding: 1em;
+      border: 0;
+      background: #fffef6;
+
+      .footer__row-count__label {
+        color: #45464a;
+      }
+
+      .footer__navigation__page-btn {
+        color: darkblue;
+      }
+    }
+  }
 </style>

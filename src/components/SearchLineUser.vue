@@ -1,12 +1,16 @@
 <template>
   <div id="search-line-user">
-    <mu-text-field label="搜尋使用者" v-model="identity" full-width
-                   action-icon="search" @keyup.enter="retrieveSpecificLineUser"></mu-text-field>
+    <mu-flex align-items="center">
+      <mu-text-field label="以使用者識別搜尋對話" v-model="identity" full-width
+                     action-icon="search" @keyup.enter="retrieveSpecificLineUser"></mu-text-field>
+      <mu-icon size="22" value="cancel" @click="cancelSearch()"></mu-icon>
+    </mu-flex>
   </div>
 </template>
 
 <script>
   import { db } from '@/modules/firebase-config'
+  import { showModal } from '@/modules/modal'
 
   export default {
     name: 'SearchLineUser',
@@ -17,7 +21,8 @@
     },
 
     props: {
-      onSearchedFn: { type: Function },
+      onSearchedFn: Function,
+      onCancelFn: () => {}
     },
 
     methods: {
@@ -28,11 +33,23 @@
           .get()
 
         let lineUserId = ''
+        if (identityQuerySnapshot.empty) {
+          showModal(vueModel, '查無此使用者識別')
+          return
+        }
+
+
         identityQuerySnapshot.forEach(identityDoc => {
           lineUserId = identityDoc.id
         })
 
         vueModel.onSearchedFn(lineUserId)
+      },
+
+      cancelSearch () {
+        const vueModel = this
+        vueModel.identity = ''
+        vueModel.onCancelFn()
       }
     }
   }
