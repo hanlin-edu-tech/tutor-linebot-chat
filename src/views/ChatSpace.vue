@@ -18,8 +18,7 @@
 <script>
   import ChatUsersList from '@/components/chat/ChatUsersList'
   import ChatRoom from '@/components/chat/ChatRoom'
-  import { auth } from '@/modules/firebase-config'
-  import { mapState } from 'vuex'
+  import { mapActions } from 'vuex'
 
   export default {
     name: 'ChatSpace',
@@ -35,43 +34,34 @@
       }
     },
 
-    computed: Object.assign(
-      {
-        siderWidth () {
-          if (window.innerWidth < window.innerHeight) {
-            return window.innerWidth
-          } else {
-            return '315'
-          }
+    computed: {
+      siderWidth () {
+        if (window.innerWidth < window.innerHeight) {
+          return window.innerWidth
+        } else {
+          return '315'
         }
-      },
-      mapState('loginUser', ['loginUserInfo'])
-    ),
+      }
+    },
 
     mounted () {
-      const vueModel = this
-      if (Object.keys(vueModel.loginUserInfo).length === 0) {
-        auth.signOut()
-        vueModel.$router.replace(`/googleAuth`)
-      }
       document.querySelector('.ivu-layout-sider-zero-width-trigger').innerHTML =
         '<span style="font-size: 15px;">收合</span>'
     },
 
-    methods: {
-      delay (millisecond) {
-        return new Promise(resolve => {
-          setTimeout(resolve, millisecond)
-        })
-      },
+    beforeDestroy () {
+      const vueModel = this
 
-      async routeChatRoom (messageInfo, lineUserId) {
+      /* 還原訊息提醒之鈴鐺顏色 */
+      vueModel.assignNotificationColorAction('#BFC9CA')
+    },
+
+    methods: Object.assign({
+      async routeChatRoom (messageInfo, lineUserId, resetZeroing) {
         const vueModel = this
         vueModel.$router.replace({ path: `/chat/space/` })
 
-        console.log(lineUserId)
-
-        await vueModel.delay(300)
+        await vueModel.$delay(300)
         vueModel.$router.replace(
           {
             name: 'ChatRoom',
@@ -83,13 +73,13 @@
           }
         )
 
+        resetZeroing(lineUserId)
+
         if (window.innerWidth < 500) {
           vueModel.isCollapsed = true
         }
-
-        vueModel.$root.$emit('assign-line-user', lineUserId)
       }
-    }
+    }, mapActions('reminder', ['assignNotificationColorAction']))
   }
 </script>
 
@@ -102,7 +92,6 @@
     .content {
       margin: 10px 5px;
       background: #fff;
-      /*min-height: 90vh;*/
     }
   }
 

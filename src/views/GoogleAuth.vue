@@ -12,8 +12,8 @@
 </template>
 
 <script>
-  import { firebase, db, auth } from '@/modules/firebase-config'
-  import 'firebase/auth'
+  import { firebase, auth } from '@/modules/firebase-config'
+  import '@firebase/auth'
   import { mapActions } from 'vuex'
   import { showModal } from '@/modules/modal'
 
@@ -32,9 +32,9 @@
           const vueModel = this
           auth.useDeviceLanguage()
           try {
-            let provider = new firebase.auth.GoogleAuthProvider()
-            let loginResult = await auth.signInWithPopup(provider)
-            let user = loginResult.user
+            const provider = new firebase.auth.GoogleAuthProvider()
+            const loginResult = await auth.signInWithPopup(provider)
+            const user = loginResult.user
             vueModel.assignLoginUserInfoAction({
               email: user.email,
               name: user.displayName,
@@ -44,33 +44,6 @@
           } catch (error) {
             showModal(vueModel, vueModel.warningText)
             auth.signOut()
-          }
-        },
-
-        async validateEhanlinUser (loginResult) {
-          const vueModel = this
-          let querySnapshot = await db.collection('AuthorizedUsers').get()
-          if (!querySnapshot) {
-            auth.signOut()
-            return
-          }
-
-          querySnapshot.forEach(doc =>
-            vueModel.authorizedEmails.push(doc.data().email)
-          )
-
-          if (loginResult.user) {
-            let user = loginResult.user
-            if (user.email && vueModel.authorizedEmails.includes(user.email)) {
-              vueModel.assignLoginUserInfoAction({
-                email: user.email,
-                name: user.displayName,
-                avatar: user.photoURL
-              })
-              vueModel.$router.push(`/chat/space`)
-            } else {
-              showModal(vueModel, vueModel.warningText)
-            }
           }
         }
       },

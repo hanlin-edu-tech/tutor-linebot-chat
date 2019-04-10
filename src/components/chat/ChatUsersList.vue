@@ -38,12 +38,12 @@
           <mu-flex justify-content="between" align-items="center">
             <template v-if="isShowEdit(lineUserId)">
               <mu-text-field :ref="lineUserId" class="edit-identity" type="text"
-                             v-model="identity"
+                             v-model="messageInfo.identity"
                              placeholder="請輸入唯一識別名稱"></mu-text-field>
 
               <mu-flex align-content="center">
                 <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
-                <mu-icon size="22" value="save" @click="saveIdentity(lineUserId)"></mu-icon>
+                <mu-icon size="22" value="save" @click="saveIdentity(messageInfo, lineUserId)"></mu-icon>
               </mu-flex>
             </template>
             <template v-else>
@@ -76,11 +76,11 @@
         identity: '',
         messages: [],
         showUsers: {},
-        identities: [],
         chatRef: db.collection('Chat'),
         identityCardRef: db.collection('Identity'),
       }
     },
+
     computed: {
       today () {
         const vueModel = this
@@ -92,23 +92,33 @@
       const vueModel = this
       try {
         const chatDocs = await vueModel.retrieveChatDocs()
-        await vueModel.initialUsersList(chatDocs)
-        vueModel.listeningOnChatAdded()
+        if (chatDocs.length > 0) {
+          await vueModel.initialUsersList(chatDocs)
+          vueModel.listeningOnChatAdded()
+        }
       } catch (error) {
         console.error(error)
       }
     },
 
     methods: {
+      retrieveIdentity (lineUserId) {
+        const vueModel = this
+        return vueModel.identityMapping.get(lineUserId)
+      },
+
       async retrieveChatDocs () {
         const vueModel = this
         const oneMonthAgo = vueModel.$dayjs().subtract(1, 'month').toDate()
         const chatQuerySnapshot = await vueModel.chatRef
           .where('updateTime', '>=', oneMonthAgo)
-          //.where('updateTime', '==', new Date('2019/04/07'))
           .orderBy('updateTime', 'desc')
           .limit(300)
           .get()
+
+        if (chatQuerySnapshot.empty) {
+          return []
+        }
 
         return chatQuerySnapshot
           .docChanges()
@@ -135,6 +145,11 @@
         const identityRef = db.collection('Identity')
         const identityQuerySnapshot = await identityRef.get()
         const identityMapping = new Map()
+        vueModel.identityMapping = identityMapping
+
+        if (identityQuerySnapshot.empty) {
+          return
+        }
 
         identityQuerySnapshot.forEach(identityDoc => {
           let lineUserId = identityDoc.id
@@ -161,9 +176,28 @@
         })
       },
 
-      retrieveIdentity (lineUserId) {
+      async composeMessageInfo (lineUserId, lineProfile, message, findUnreadUser = () => {}) {
         const vueModel = this
-        return vueModel.identityMapping.get(lineUserId)
+        const unreadMessagesQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
+          .collection('Message')
+          .where('read', '==', false)
+          .get()
+
+        const unreadMessagesCount = unreadMessagesQuerySnapshot.size
+        if (unreadMessagesCount > 0) {
+          findUnreadUser()
+        }
+
+        return {
+          lineUserId: lineUserId,
+          lineUserName: lineProfile.lineUserName,
+          lineUserAvatar: lineProfile.lineUserAvatar,
+          text: message.text,
+          updateTime: vueModel.$dayjs(message.updateTime.toDate()),
+          unreadMessagesCount: unreadMessagesCount,
+          unreadMessagesCountDesc: String(unreadMessagesCount),
+          isEditIdentity: false
+        }
       },
 
       async initialUsersList (chatDocs) {
@@ -191,73 +225,62 @@
         vueModel.isLoading = false
       },
 
-      async composeMessageInfo (lineUserId, lineProfile, message, findUnreadUser = () => {}) {
+      resetZeroing (lineUserId) {
         const vueModel = this
-        const unreadMessagesQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
-          .collection('Message')
-          .where('read', '==', false)
-          .get()
-
-        const unreadMessagesCount = unreadMessagesQuerySnapshot.size
-        if (unreadMessagesCount > 0) {
-          findUnreadUser()
-        }
-
-        return {
-          lineUserId: lineUserId,
-          lineUserName: lineProfile.lineUserName,
-          lineUserAvatar: lineProfile.lineUserAvatar,
-          text: message.text,
-          updateTime: vueModel.$dayjs(message.updateTime.toDate()),
-          unreadMessagesCount: unreadMessagesCount,
-          unreadMessagesCountDesc: String(unreadMessagesCount),
-          isEditIdentity: false
-        }
+        const unreadMessagesCount = 0
+        vueModel.showUsers[lineUserId].unreadMessagesCount = unreadMessagesCount
+        vueModel.showUsers[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
       },
 
-      listeningOnMessageAdded (lineUserId, lineUserProfile,
-                               onFireSearchedUser = () => {}) {
-        const vueModel = this
-        db.collection(`Chat/${lineUserId}/Message`)
-          .onSnapshot(vueModel.messageFire(lineUserId, lineUserProfile, onFireSearchedUser))
-      },
-
-      messageFire (lineUserId, lineUserProfile, onFiredSearchedUser) {
+      messageFire (lineUserId, lineUserProfile, onFiredSearchedUserFn) {
         const vueModel = this
         return async messageQuerySnapshot => {
-          let onFiredLastMessage
           let messageLastChange = messageQuerySnapshot.docChanges().last()
           if (!messageLastChange) {
             return
           }
 
-          onFiredLastMessage = messageLastChange.doc.data()
           if (messageLastChange.type === 'added') {
             if (vueModel.showUsers && vueModel.showUsers[lineUserId]) {
+              let onFiredLastMessage = messageLastChange.doc.data()
               let existedSpecificMessageInfo = vueModel.showUsers[lineUserId]
               let lastUpdateTime = onFiredLastMessage.updateTime.toDate()
+
               /* 如果現存訊息的時戳比 lastMessage 早，表示 lastMessage 為新增的訊息 */
-              if (existedSpecificMessageInfo.updateTime.isBefore(vueModel.$dayjs(lastUpdateTime))) {
+              const isBeforeLastUpdateTime =
+                existedSpecificMessageInfo.updateTime.isBefore(vueModel.$dayjs(lastUpdateTime))
+              if (isBeforeLastUpdateTime) {
+                let isDiffLineUserId
                 /* 重新取代為新訊息 */
                 vueModel.showUsers[lineUserId] =
                   await vueModel.composeMessageInfo(lineUserId, lineUserProfile, onFiredLastMessage)
 
-                /* 如果新進訊息之 line user 並非當前對話之對象，則將此新訊息之 line user，排列至使用者列表上方 */
-                if (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId) {
+                /*
+                 * 當前尚未進入 line user 專屬對話室 (activatedLineUser 為空)
+                 * 或新進訊息之 line user 並非當前對話室之對象，
+                 * 則將此新訊息之 line user，排列至使用者列表上方
+                 */
+                isDiffLineUserId = (vueModel.activatedLineUser && vueModel.activatedLineUser !== lineUserId)
+                if (!vueModel.activatedLineUser || isDiffLineUserId) {
                   let newUserMessageInfo = {}
                   newUserMessageInfo[lineUserId] = {}
                   vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
+                } else if (vueModel.activatedLineUser === lineUserId) {
+                  vueModel.resetZeroing(lineUserId)
                 }
               }
             }
-          } else if (messageLastChange.type === 'modified') {
-            /* 當訊息更新為已讀狀態，才會觸發 */
-            let unreadMessagesCount = 0
-            vueModel.showUsers[lineUserId].unreadMessagesCount = unreadMessagesCount
-            vueModel.showUsers[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
           }
-          await onFiredSearchedUser(lineUserId, lineUserProfile, onFiredLastMessage)
+
+          await onFiredSearchedUserFn(lineUserId, lineUserProfile, messageLastChange)
         }
+      },
+
+      listeningOnMessageAdded (lineUserId, lineUserProfile,
+                               onFireSearchedUserFn = () => {}) {
+        const vueModel = this
+        db.collection(`Chat/${lineUserId}/Message`)
+          .onSnapshot(vueModel.messageFire(lineUserId, lineUserProfile, onFireSearchedUserFn))
       },
 
       listeningOnChatAdded () {
@@ -265,19 +288,21 @@
         vueModel.chatRef.onSnapshot(
           async chatQuerySnapshot => {
             let chatLastChange = chatQuerySnapshot.docChanges().last()
-            let lineUserId, lineUserProfile
             if (!chatLastChange) {
               return
             }
 
-            lineUserId = chatLastChange.doc.id
-            lineUserProfile = chatLastChange.doc.data()
             if (chatLastChange.type === 'added') {
+              const lineUserId = chatLastChange.doc.id
+              const lineUserProfile = chatLastChange.doc.data()
               if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
                 const lastMessage = await vueModel.retrieveLastMessage(lineUserId)
+
                 /* 新的使用者傳入訊息 */
-                let newMessageInfo = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
-                vueModel.$set(vueModel.showUsers, lineUserId, newMessageInfo)
+                let newUserMessageInfo = {}
+                newUserMessageInfo[lineUserId] = await vueModel.composeMessageInfo(lineUserId, lineUserProfile, lastMessage)
+                vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
+
                 vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
               }
             }
@@ -288,7 +313,7 @@
       entryChatRoom (messageInfo, lineUserId) {
         const vueModel = this
         vueModel.activatedLineUser = lineUserId
-        vueModel.$emit('route-chat-room', messageInfo, lineUserId)
+        vueModel.$emit('route-chat-room', messageInfo, lineUserId, vueModel.resetZeroing)
       },
 
       isShowEdit (lineUserId) {
@@ -306,13 +331,18 @@
         vueModel.showUsers[lineUserId].isEditIdentity = true
       },
 
-      async saveIdentity (lineUserId) {
+      async saveIdentity (messageInfo, lineUserId) {
         const vueModel = this
         const now = firebase.firestore.Timestamp.fromDate(new Date())
         let identityQuerySnapshot, identityDocRef, identityDoc
 
+        if (!messageInfo.identity || messageInfo.identity.length === 0) {
+          showModal(vueModel, '使用者識別不能為空值')
+          return
+        }
+
         identityQuerySnapshot = await vueModel.identityCardRef
-          .where('identity', '==', vueModel.identity)
+          .where('identity', '==', messageInfo.identity)
           .get()
 
         if (!identityQuerySnapshot.empty) {
@@ -324,12 +354,12 @@
         identityDoc = identityDocRef.get()
         if (identityDoc.exists) {
           await identityDocRef.set({
-            identity: vueModel.identity,
+            identity: messageInfo.identity,
             updateTime: now
           }, { merge: true })
         } else {
           await identityDocRef.set({
-            identity: vueModel.identity,
+            identity: messageInfo.identity,
             createTime: now,
             updateTime: now
           })
@@ -355,14 +385,15 @@
         if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
           vueModel.listeningOnMessageAdded(lineUserId, searchedUserProfile,
             async (lineUserId, searchedUserProfile, searchedUserMessageLastChange) => {
-              const searchedUserOnFiredLastMessage = searchedUserMessageLastChange.doc.data()
-              if (searchedUserLastMessage.type === 'added') {
+              if (searchedUserMessageLastChange.type === 'added') {
+                const searchedUserOnFiredLastMessage = searchedUserMessageLastChange.doc.data()
                 let existedSpecificMessageInfo = vueModel.searchedUser[lineUserId]
                 let lastUpdateTime = searchedUserOnFiredLastMessage.updateTime.toDate()
+
                 if (existedSpecificMessageInfo.updateTime.isBefore(vueModel.$dayjs(lastUpdateTime))) {
                   vueModel.searchedUser[lineUserId] =
                     await vueModel.composeMessageInfo(lineUserId, searchedUserProfile, searchedUserOnFiredLastMessage)
-                } else if (searchedUserLastMessage.type === 'modified') {
+                } else if (searchedUserMessageLastChange.type === 'modified') {
                   let unreadMessagesCount = 0
                   vueModel.searchedUser[lineUserId].unreadMessagesCount = unreadMessagesCount
                   vueModel.searchedUser[lineUserId].unreadMessagesCountDesc = String(unreadMessagesCount)
@@ -378,10 +409,11 @@
 
       returnToOriginalShowUsers () {
         const vueModel = this
-        vueModel.showUsers = vueModel.originalShowUsers
+        if (vueModel.originalShowUsers) {
+          vueModel.showUsers = vueModel.originalShowUsers
+        }
       }
     },
-
   }
 </script>
 <style lang="less">

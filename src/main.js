@@ -34,15 +34,17 @@ Vue.prototype.$Modal = Modal
 
 dayjs.locale('zh-tw')
 Vue.prototype.$dayjs = dayjs
+Vue.prototype.$delay = (millisecond) => {
+  return new Promise(resolve => {
+    setTimeout(resolve, millisecond)
+  })
+}
 
 Vue.config.errorHandler = (err, vueModel, info) => {
-  console.log(info)
   showModal(vueModel, '發生錯誤囉')
-  console.log(err)
 }
 
 router.beforeEach((to, from, next) => {
-  console.log(to)
   const requiresAuth = to.matched.some(route => route.meta.requiresAuth)
   const currentUser = firebase.auth().currentUser
 

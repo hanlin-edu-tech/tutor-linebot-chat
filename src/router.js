@@ -16,10 +16,7 @@ export default new Router({
     {
       path: '/reminder',
       name: 'Reminder',
-      component: () => import('@/views/Reminder.vue'),
-      meta: {
-        requiresAuth: true
-      }
+      component: () => import('@/views/Reminder.vue')
     },
     {
       path: '/chat/space',

@@ -76,7 +76,9 @@
   export default {
     name: 'ChatRoom',
     data () {
+      const vueModel = this
       return {
+        oneMonthAgo: vueModel.$dayjs().subtract(1, 'month').toDate(),
         messageText: '',
         messages: {},
         isPreviewImage: false,
@@ -142,9 +144,8 @@
 
       listeningOnMessageAdded () {
         const vueModel = this
-        const oneMonthAgo = vueModel.$dayjs().subtract(1, 'month').toDate()
         vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
-          .where('updateTime', '>', oneMonthAgo)
+          .where('updateTime', '>', vueModel.oneMonthAgo)
           .orderBy('updateTime', 'asc')
           .limit(1000)
           .onSnapshot(async messageQuerySnapshot => {

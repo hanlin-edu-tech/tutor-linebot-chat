@@ -22,7 +22,7 @@
 
     props: {
       onSearchedFn: Function,
-      onCancelFn: () => {}
+      onCancelFn: Function
     },
 
     methods: {
