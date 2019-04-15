@@ -12,11 +12,23 @@
           <SearchLineUser :on-searched-fn="retrieveSpecificUserProfile"></SearchLineUser>
         </mu-col>
       </mu-row>
-      <mu-row>
+      <mu-row v-show="isShowSearchResult">
         <mu-col span="12">
-          <vue-good-table v-show="isShowSearchResult"
-                          :columns="headerInfo" :rows="messages"
-                          :search-options="searchOptions"
+          <div class="vgt-global-search vgt-clearfix">
+            <div class="vgt-global-search__input vgt-pull-left">
+              <span class="input__icon">
+                <div class="magnifying-glass"></div>
+              </span>
+              <input type="text" placeholder="鍵入 Enter 搜尋訊息中關鍵字"
+                     class="vgt-input vgt-pull-left" v-model="searchTerm">
+            </div>
+            <div class="vgt-global-search__actions vgt-pull-right"></div>
+          </div>
+          <vue-good-table :columns="headerInfo" :rows="messages"
+                          :search-options="{
+                            enabled: true,
+                            externalQuery: searchTerm
+                          }"
                           :pagination-options="paginationOptions"
                           styleClass="vgt-table condensed">
             <template slot="table-row" slot-scope="props">
@@ -45,6 +57,7 @@
       return {
         startDate: vueModel.$dayjs().format('YYYY-MM-DD'),
         expiryDate: vueModel.$dayjs().format('YYYY-MM-DD'),
+        searchTerm: '',
         isShowSearchResult: false,
         messages: [],
         headerInfo: [
@@ -60,12 +73,6 @@
             thClass: 'table-header'
           }
         ],
-        searchOptions: {
-          enabled: true,
-          trigger: 'enter',
-          skipDiacritics: true,
-          placeholder: '搜尋訊息中關鍵字'
-        },
         paginationOptions: {
           enabled: true,
           mode: 'pages',
@@ -94,6 +101,7 @@
         vueModel.lineUserName = searchedUserProfile.lineUserName
 
         await vueModel.retrieveMessages(lineUserId)
+        vueModel.searchTerm = ''
         vueModel.isShowSearchResult = true
       },
 
@@ -123,7 +131,7 @@
         })
         vueModel.messages = messages
       }
-    },
+    }
   }
 </script>
 

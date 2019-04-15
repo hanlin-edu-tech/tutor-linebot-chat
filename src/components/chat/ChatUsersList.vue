@@ -72,7 +72,6 @@
     data () {
       return {
         isLoading: true,
-        isShowUsers: true,
         identity: '',
         messages: [],
         showUsers: {},
@@ -403,7 +402,10 @@
           )
         }
 
-        vueModel.originalShowUsers = vueModel.showUsers
+        /* 第一次搜尋使用者時，將原初的使用者列表放入 vueModel.originalShowUsers */
+        if (!vueModel.originalShowUsers) {
+          vueModel.originalShowUsers = vueModel.showUsers
+        }
         vueModel.showUsers = vueModel.searchedUser
       },
 

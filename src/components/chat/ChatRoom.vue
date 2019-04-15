@@ -1,6 +1,10 @@
 <template>
   <section id="chat-room">
     <article id="dialog" ref="dialog">
+      <mu-flex justify-content="center">
+        <mu-circular-progress v-if="isLoading"
+                              color="success" :stroke-width="7" :size="56"></mu-circular-progress>
+      </mu-flex>
       <mu-flex v-for="(messageInfo, id) in messages" :key="id"
                :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
                :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
@@ -78,6 +82,7 @@
     data () {
       const vueModel = this
       return {
+        isLoading: true,
         oneMonthAgo: vueModel.$dayjs().subtract(1, 'month').toDate(),
         messageText: '',
         messages: {},
@@ -95,25 +100,37 @@
 
     computed: mapState('loginUser', ['loginUserInfo']),
 
-    mounted () {
+    async mounted () {
       const vueModel = this
-      try {
-        vueModel.storageRef = storage.ref('/images/')
-        vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
-        vueModel.retrieveMessages()
-      } catch (error) {
-        console.error(error)
-      }
+      await vueModel.initial()
     },
 
-    async beforeDestroy () {
+    beforeDestroy () {
       const vueModel = this
-      if (vueModel.cancelListening && typeof vueModel.cancelListening === 'function') {
-        vueModel.cancelListening()
-      }
+      vueModel.cancelListening()
     },
 
     methods: {
+      async initial () {
+        const vueModel = this
+        try {
+          vueModel.storageRef = storage.ref('/images/')
+          vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
+          await vueModel.retrieveMessages()
+          vueModel.isLoading = false
+        } catch (error) {
+          console.error(error)
+          showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
+        }
+      },
+
+      cancelListening () {
+        const vueModel = this
+        if (vueModel.cancelListening && typeof vueModel.cancelListening === 'function') {
+          vueModel.cancelListening()
+        }
+      },
+
       formatUpdateTime (updateTime) {
         const vueModel = this
         return vueModel.$dayjs(updateTime.toDate()).format('YYYY-MM-DD HH:mm:ss')
@@ -138,11 +155,16 @@
             messages[messageDoc.id] = messageDoc.data()
           })
           vueModel.messages = messages
-          vueModel.listeningOnMessageAdded()
+
+          /* 稍稍等待圖片加載完成 */
+          await vueModel.$delay(1000)
+          await vueModel.listeningOnMessageAdded()
+        } else {
+          showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
         }
       },
 
-      listeningOnMessageAdded () {
+      async listeningOnMessageAdded () {
         const vueModel = this
         vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
           .where('updateTime', '>', vueModel.oneMonthAgo)
@@ -162,7 +184,7 @@
 
               vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
               vueModel.$nextTick(vueModel.scrollBottom)
-              vueModel.updateMessagesToRead()
+              await vueModel.updateMessagesToRead()
             }
           })
       },
@@ -269,7 +291,7 @@
         let response = await vueModel
           .axios({
             method: 'post',
-            url: 'https://www.ehanlin.com.tw/linebot/admin/pushChatMessage',
+            url: '/linebot/admin/pushChatMessage',
             data: {
               lineUserId: lineUserId,
               messageText: messageText,
