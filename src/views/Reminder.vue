@@ -57,6 +57,6 @@
     position: absolute;
     top: 0;
     left: 0;
-    background-color: #F8F8F8;
+    background-color: #FAFAFA;
   }
 </style>

@@ -18,6 +18,7 @@ import 'iview/dist/styles/iview.css'
 import 'vue-good-table/dist/vue-good-table.css'
 
 util.registerArrayLast()
+util.registerArrayFirst()
 
 // 關閉 vue instance 產生時的提示
 Vue.config.productionTip = false
@@ -40,7 +41,8 @@ Vue.prototype.$delay = (millisecond) => {
   })
 }
 
-Vue.config.errorHandler = (err, vueModel, info) => {
+Vue.config.errorHandler = (error, vueModel, info) => {
+  console.error(error)
   showModal(vueModel, '發生錯誤囉')
 }
 

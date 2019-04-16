@@ -107,7 +107,9 @@
 
     beforeDestroy () {
       const vueModel = this
-      vueModel.cancelListening()
+      if (vueModel.cancelListening && typeof vueModel.cancelListening === 'function') {
+        vueModel.cancelListening()
+      }
     },
 
     methods: {
@@ -121,13 +123,6 @@
         } catch (error) {
           console.error(error)
           showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
-        }
-      },
-
-      cancelListening () {
-        const vueModel = this
-        if (vueModel.cancelListening && typeof vueModel.cancelListening === 'function') {
-          vueModel.cancelListening()
         }
       },
 
@@ -171,18 +166,18 @@
           .orderBy('updateTime', 'asc')
           .limit(1000)
           .onSnapshot(async messageQuerySnapshot => {
-            let lastMessageDoc
-            let lastChange = messageQuerySnapshot.docChanges().last()
-            if (!lastChange) {
+            let newestMessageDoc
+            let newestMessageChange = messageQuerySnapshot.docChanges().last()
+            if (!newestMessageChange) {
               return
             }
 
-            if (lastChange.type === 'added') {
-              lastMessageDoc = lastChange.doc
-              const lastMessageId = lastMessageDoc.id
-              const lastMessage = lastMessageDoc.data()
+            if (newestMessageChange.type === 'added') {
+              newestMessageDoc = newestMessageChange.doc
+              const newestMessageId = newestMessageDoc.id
+              const newestMessage = newestMessageDoc.data()
 
-              vueModel.$set(vueModel.messages, lastMessageId, lastMessage)
+              vueModel.$set(vueModel.messages, newestMessageId, newestMessage)
               vueModel.$nextTick(vueModel.scrollBottom)
               await vueModel.updateMessagesToRead()
             }
@@ -291,7 +286,7 @@
         let response = await vueModel
           .axios({
             method: 'post',
-            url: '/linebot/admin/pushChatMessage',
+            url: 'https://www.ehanlin.com.tw/linebot/admin/pushChatMessage',
             data: {
               lineUserId: lineUserId,
               messageText: messageText,
