@@ -59,7 +59,8 @@
               </mu-flex>
             </section>
             <mu-flex class="flex-demo" fill justify-content="end">
-              <input id="upload-image" type="file" accept="image/*" @change="paintCanvas($event)" style="display: none;">
+              <input id="upload-image" type="file" accept="image/*" @change="paintCanvas($event)"
+                     style="display: none;">
               <mu-icon class="image-control-icon" v-show="originalImageUrl" size="30" value="delete_forever"
                        @click="cancelImage"></mu-icon>
               <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
@@ -121,9 +122,6 @@
           vueModel.storageRef = storage.ref('/images/')
           vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
           await vueModel.retrieveMessages()
-
-          // 為了加載圖片，直接延遲 1.5 秒
-          await vueModel.$delay(1500)
           vueModel.isLoading = false
         } catch (error) {
           console.error(error)
@@ -137,8 +135,17 @@
       },
 
       scrollBottom () {
-        let dialogTarget = document.getElementById('dialog')
-        dialogTarget.scrollTop = dialogTarget.scrollHeight
+        const dialogTarget = document.getElementById('dialog')
+        const imageLoaded = () => {
+          dialogTarget.scrollTop = dialogTarget.scrollHeight
+        }
+        const allImgTarget = document.querySelector('img')
+
+        if (allImgTarget.complete) {
+          imageLoaded()
+        } else {
+          allImgTarget.addEventListener('load', imageLoaded)
+        }
       },
 
       async retrieveMessages () {
@@ -156,8 +163,8 @@
           })
           vueModel.messages = messages
 
-          /* 稍稍等待圖片加載完成 */
-          await vueModel.$delay(1000)
+          // /* 稍稍等待圖片加載完成 */
+          // await vueModel.$delay(1500)
           await vueModel.listeningOnMessageAdded()
         } else {
           showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
