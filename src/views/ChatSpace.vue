@@ -47,11 +47,8 @@
     mounted () {
       document.querySelector('.ivu-layout-sider-zero-width-trigger').innerHTML =
         '<span style="font-size: 15px;">收合</span>'
-    },
 
-    beforeDestroy () {
       const vueModel = this
-
       /* 還原訊息提醒之鈴鐺顏色 */
       vueModel.assignNotificationColorAction('#BFC9CA')
     },

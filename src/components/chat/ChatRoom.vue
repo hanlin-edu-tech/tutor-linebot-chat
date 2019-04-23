@@ -1,74 +1,76 @@
 <template>
   <section id="chat-room">
-    <article id="dialog" ref="dialog">
-      <mu-flex justify-content="center">
-        <mu-circular-progress v-if="isLoading"
-                              color="success" :stroke-width="7" :size="56"></mu-circular-progress>
-      </mu-flex>
-      <mu-flex v-for="(messageInfo, id) in messages" :key="id"
-               :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
-               :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
-        <mu-flex class="dialog-row" direction="column"
-                 :align-items="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
-          <mu-flex class="dialog-avatar" justify-content="start">
-            <mu-avatar style="margin-right: 5px;" :size="37">
-              <img :src="!messageInfo.ehanlinCustomerService ?
+    <mu-flex justify-content="center">
+      <mu-circular-progress v-show="isLoading"
+                            color="success" :stroke-width="7" :size="56"></mu-circular-progress>
+    </mu-flex>
+    <section v-show="!isLoading">
+      <article id="dialog" ref="dialog">
+        <mu-flex v-for="(messageInfo, id) in messages" :key="id"
+                 :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
+                 :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
+          <mu-flex class="dialog-row" direction="column"
+                   :align-items="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
+            <mu-flex class="dialog-avatar" justify-content="start">
+              <mu-avatar style="margin-right: 5px;" :size="37">
+                <img :src="!messageInfo.ehanlinCustomerService ?
               lineUserAvatar : messageInfo.ehanlinCustomerService.avatar">
-            </mu-avatar>
-            <mu-flex direction="column" justify-content="start">
-              <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
-              <span class="dialog-text">
+              </mu-avatar>
+              <mu-flex direction="column" justify-content="start">
+                <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
+                <span class="dialog-text">
                 {{ !messageInfo.ehanlinCustomerService ? lineUserName : messageInfo.ehanlinCustomerService.name }}
               </span>
+              </mu-flex>
             </mu-flex>
-          </mu-flex>
-          <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
-            <img class="chat-image" :src="messageInfo.imageUrl">
-          </a>
-          <a v-show="messageInfo.fileUrl" :href="messageInfo.fileUrl" target="_blank">
-            <img class="chat-image"
-                 src="https://s3-ap-northeast-1.amazonaws.com/ehanlin-web-resource/linebot/file/file_icon.png">
-          </a>
-          <article v-show="!messageInfo.imageUrl"
-                   :class="!messageInfo.ehanlinCustomerService ?
+            <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
+              <img class="chat-image" :src="messageInfo.imageUrl">
+            </a>
+            <a v-show="messageInfo.fileUrl" :href="messageInfo.fileUrl" target="_blank">
+              <img class="chat-image"
+                   src="https://s3-ap-northeast-1.amazonaws.com/ehanlin-web-resource/linebot/file/file_icon.png">
+            </a>
+            <article v-show="!messageInfo.imageUrl"
+                     :class="!messageInfo.ehanlinCustomerService ?
                    'dialog-block-user' : 'dialog-block-ehanlin'">
-            <template v-for="line in messageInfo.text.split('\n')">{{line}}<br /></template>
-          </article>
-        </mu-flex>
-      </mu-flex>
-    </article>
-    <article id="dialog-input">
-      <mu-container>
-        <mu-row style="background-color: #f1f7fe;">
-          <section style="width: 75%;" v-show="!isPreviewImage">
-            <mu-flex fill justify-content="start">
-              <mu-text-field v-model="messageText"
-                             multi-line full-width :rows="3" :rows-max="5"
-                             @keypress.enter.exact="sentMessage"
-                             underline-color="#004ec4">
-              </mu-text-field>
-            </mu-flex>
-          </section>
-          <section style="width: 75%; min-height: 80px;" v-show="isPreviewImage">
-            <mu-flex fill justify-content="start">
-              <mu-circular-progress style="margin-top: 20px;" :size="36"
-                                    v-show="isShowImageProgress">
-              </mu-circular-progress>
-              <img id="preview-image" class="chat-image-preview" :src="originalImageUrl">
-            </mu-flex>
-          </section>
-          <mu-flex class="flex-demo" fill justify-content="end">
-            <input id="upload-image" type="file" accept="image/*" @change="paintCanvas($event)" style="display: none;">
-            <mu-icon class="image-control-icon" v-show="originalImageUrl" size="30" value="delete_forever"
-                     @click="cancelImage"></mu-icon>
-            <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
-                     @click="sentImage"></mu-icon>
-            <mu-icon class="image-control-icon" size="27" value="add_photo_alternate"
-                     @click="triggerUploadImage"></mu-icon>
+              <template v-for="line in messageInfo.text.split('\n')">{{line}}<br /></template>
+            </article>
           </mu-flex>
-        </mu-row>
-      </mu-container>
-    </article>
+        </mu-flex>
+      </article>
+      <article id="dialog-input">
+        <mu-container>
+          <mu-row style="background-color: #f1f7fe;">
+            <section style="width: 75%;" v-show="!isPreviewImage">
+              <mu-flex fill justify-content="start">
+                <mu-text-field v-model="messageText"
+                               multi-line full-width :rows="3" :rows-max="5"
+                               @keypress.enter.exact="sentMessage"
+                               underline-color="#004ec4">
+                </mu-text-field>
+              </mu-flex>
+            </section>
+            <section style="width: 75%; min-height: 80px;" v-show="isPreviewImage">
+              <mu-flex fill justify-content="start">
+                <mu-circular-progress style="margin-top: 20px;" :size="36"
+                                      v-show="isShowImageProgress">
+                </mu-circular-progress>
+                <img id="preview-image" class="chat-image-preview" :src="originalImageUrl">
+              </mu-flex>
+            </section>
+            <mu-flex class="flex-demo" fill justify-content="end">
+              <input id="upload-image" type="file" accept="image/*" @change="paintCanvas($event)" style="display: none;">
+              <mu-icon class="image-control-icon" v-show="originalImageUrl" size="30" value="delete_forever"
+                       @click="cancelImage"></mu-icon>
+              <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
+                       @click="sentImage"></mu-icon>
+              <mu-icon class="image-control-icon" size="27" value="add_photo_alternate"
+                       @click="triggerUploadImage"></mu-icon>
+            </mu-flex>
+          </mu-row>
+        </mu-container>
+      </article>
+    </section>
   </section>
 </template>
 
@@ -119,6 +121,9 @@
           vueModel.storageRef = storage.ref('/images/')
           vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
           await vueModel.retrieveMessages()
+
+          // 為了加載圖片，直接延遲 1.5 秒
+          await vueModel.$delay(1500)
           vueModel.isLoading = false
         } catch (error) {
           console.error(error)
