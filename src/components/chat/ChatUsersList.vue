@@ -15,35 +15,39 @@
               <img :src="messageInfo.lineUserAvatar">
             </mu-avatar>
           </mu-list-item-action>
-          <mu-ripple class="ripple-entry"
-                     v-show="!isShowEdit(lineUserId)" @click="entryChatRoom(messageInfo, lineUserId)">
-            <mu-list-item-content>
+          <mu-list-item-content v-show="!isShowEdit(lineUserId)">
+            <mu-flex justify-content="between">
               <mu-list-item-title class="line-user-name">
                 {{ messageInfo.lineUserName }}
               </mu-list-item-title>
-              <mu-list-item-sub-title>
-              <span v-show="retrieveIdentity(lineUserId)" class="identity">
-                {{ retrieveIdentity(lineUserId) }}
+              <span class="remove-identity"
+                    v-show="retrieveIdentity(lineUserId)" @click="removeIdentity(lineUserId)">
+                移除識別
               </span>
+            </mu-flex>
+            <mu-ripple class="entry-room"
+                       @click="entryChatRoom(messageInfo, lineUserId)">
+              <mu-list-item-sub-title>
+                <span v-show="retrieveIdentity(lineUserId)" class="identity">
+                  {{ retrieveIdentity(lineUserId) }}
+                </span>
               </mu-list-item-sub-title>
               <mu-list-item-sub-title>
                 <span style="font-size: 12px">{{ messageInfo.text }}</span>
               </mu-list-item-sub-title>
               <mu-divider></mu-divider>
-            </mu-list-item-content>
-          </mu-ripple>
+            </mu-ripple>
+          </mu-list-item-content>
           <mu-flex justify-content="between" align-items="center">
             <template v-if="isShowEdit(lineUserId)">
               <mu-text-field :ref="lineUserId" class="edit-identity" type="text"
                              v-model="messageInfo.identity"
                              placeholder="請輸入唯一識別名稱"></mu-text-field>
-              <mu-flex align-content="center">
-                <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
-                <mu-icon size="22" value="save" @click="saveIdentity(messageInfo, lineUserId)"></mu-icon>
-              </mu-flex>
+              <mu-icon size="22" value="cancel" @click="cancelEdit(lineUserId)"></mu-icon>
+              <mu-icon size="22" value="save" @click="saveIdentity(messageInfo, lineUserId)"></mu-icon>
             </template>
             <template v-else>
-              <mu-icon class="icon-style" size="22" value="edit" color="saddlebrown"
+              <mu-icon class="icon-style" size="22" value="edit" color="#536c99"
                        @click="editIdentity(messageInfo, lineUserId)"></mu-icon>
             </template>
           </mu-flex>
@@ -94,10 +98,6 @@
     async mounted () {
       const vueModel = this
       try {
-        //const chatDocs = await vueModel.retrieveChatDocs()
-        // if (chatDocs.length > 0) {
-        //
-        // }
         await vueModel.initialUsersList()
         vueModel.listeningOnChatAdded()
         vueModel.listeningOnIdentityUpsert()
@@ -110,6 +110,16 @@
       retrieveIdentity (lineUserId) {
         const vueModel = this
         return vueModel.identityMapping.get(lineUserId)
+      },
+
+      async removeIdentity (lineUserId) {
+        const vueModel = this
+        try {
+          await db.collection('Identity').doc(lineUserId).delete()
+          showModal(vueModel, '成功刪除識別')
+        } catch (error) {
+          showModal(vueModel, '刪除識別發生錯誤')
+        }
       },
 
       async retrieveSpecificMessageDocs (lineUserId) {
@@ -153,17 +163,15 @@
           if (identityNewestChange.type === 'added' || identityNewestChange.type === 'modified') {
             vueModel.identityMapping.set(lineUserId, identityInfo.identity)
             vueModel.$forceUpdate()
+          } else if (identityNewestChange.type === 'removed') {
+            vueModel.identityMapping.delete(lineUserId)
+            vueModel.$forceUpdate()
           }
         })
       },
 
       async composeMessageInfo (lineUserId, lineProfile, newestMessage, messageDocs, findUnreadUser = () => {}) {
         const vueModel = this
-        // const unreadMessagesQuerySnapshot = await vueModel.chatRef.doc(lineUserId)
-        //   .collection('Message')
-        //   .where('read', '==', false)
-        //   .get()
-
         const unreadMessagesCount = messageDocs.filter(messageDoc => messageDoc.data().read === false).length
         if (unreadMessagesCount > 0) {
           findUnreadUser()
@@ -268,7 +276,6 @@
 
           /* 合併訊息，並讓有未讀訊息之 lineUserId 保持在物件中的前方 */
           vueModel.showUsers = { ...unreadUsers, ...allUsers }
-          //vueModel.$forceUpdate()
         }
 
         perCycleRecord = 17
@@ -467,7 +474,9 @@
     overflow: scroll;
 
     .mu-ripple-wrapper {
-      width: 80%;
+      margin-left: 10px;
+      width: 68%;
+      cursor: pointer;
     }
 
     .date-header-font {
@@ -476,31 +485,35 @@
       color: #484848;
     }
 
-    .mu-item-sub-title {
-      /*line-height: 1.4;*/
-    }
-
-    .ripple-entry {
+    .entry-room {
       margin-left: 7px;
-      width: 60%;
-      cursor: pointer;
     }
 
     .line-user-name {
+      margin-left: 7px;
       width: 60%;
-      font-weight: 800;
-      font-size: 14px;
-      height: 21px;
-      line-height: 21px;
+      font-weight: 900;
+      font-size: 13px;
+      height: 22px;
+      line-height: 22px;
       color: #494949;
     }
 
     .identity {
-      font-weight: 500;
+      font-weight: 600;
+      font-size: 12px;
       color: #f1fbfb;
       background-color: teal;
-      padding: 0 5px;
+      padding: 0 4px;
       border-radius: 10px;
+    }
+
+    .remove-identity {
+      margin-top: 2px;
+      font-weight: 700;
+      font-size: 12px;
+      color: #78000b;
+      cursor: pointer;
     }
 
     .icon-style {
@@ -514,9 +527,8 @@
     }
 
     .edit-identity {
-      margin-bottom: 0;
-      margin-left: 5px;
-      width: 72%;
+      margin: 0 10px;
+      width: 100%;
     }
 
     .search-line-user {
