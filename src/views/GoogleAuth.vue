@@ -12,7 +12,7 @@
 </template>
 
 <script>
-  import { firebase, auth } from '@/modules/firebase-config'
+  import { db, firebase, auth } from '@/modules/firebase-config'
   import '@firebase/auth'
   import { mapActions } from 'vuex'
   import { showModal } from '@/modules/modal'
@@ -35,6 +35,8 @@
             const provider = new firebase.auth.GoogleAuthProvider()
             const loginResult = await auth.signInWithPopup(provider)
             const user = loginResult.user
+
+            await vueModel.authenticateUserByAccessFirestore()
             vueModel.assignLoginUserInfoAction({
               email: user.email,
               name: user.displayName,
@@ -45,6 +47,10 @@
             showModal(vueModel, vueModel.warningText)
             auth.signOut()
           }
+        },
+
+        async authenticateUserByAccessFirestore () {
+          await db.collection('Identity').get()
         }
       },
 

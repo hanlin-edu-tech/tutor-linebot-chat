@@ -278,7 +278,7 @@
           vueModel.showUsers = { ...unreadUsers, ...allUsers }
         }
 
-        perCycleRecord = 17
+        perCycleRecord = 20
         const chatQuerySnapshot = await vueModel.chatRef
           .where('updateTime', '>=', vueModel.oneMonthAgo)
           .orderBy('updateTime', 'desc')
@@ -305,7 +305,6 @@
           }
           newestChatDocSnapshot = chatQuerySnapshot.docs.last()
           await processFn(chatQuerySnapshot.docs)
-          await vueModel.$delay(1000)
         }
 
         if (!isIdentityEmpty) {
@@ -314,7 +313,6 @@
 
         lineUsersInfo.forEach(lineUsersInfo =>
           vueModel.listeningOnMessageAdded(lineUsersInfo.lineUserId, lineUsersInfo.lineUserProfile))
-
         vueModel.isLoading = false
       },
 
@@ -327,7 +325,10 @@
 
       listeningOnChatAdded () {
         const vueModel = this
-        vueModel.chatRef.onSnapshot(
+        vueModel.chatRef
+          .where('updateTime', '>=', vueModel.oneMonthAgo)
+          .orderBy('updateTime', 'asc')
+          .onSnapshot(
           async chatQuerySnapshot => {
             let chatNewestChange = chatQuerySnapshot.docChanges().last()
             if (chatNewestChange.type === 'added') {

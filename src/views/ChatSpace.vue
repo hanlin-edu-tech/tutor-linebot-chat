@@ -8,7 +8,7 @@
       </Sider>
       <Layout>
         <Content class="content">
-          <router-view></router-view>
+          <router-view :key="$route.fullPath"></router-view>
         </Content>
       </Layout>
     </Layout>
@@ -56,9 +56,6 @@
     methods: Object.assign({
       async routeChatRoom (messageInfo, lineUserId, resetZeroing) {
         const vueModel = this
-        vueModel.$router.replace({ path: `/chat/space/` })
-
-        await vueModel.$delay(300)
         vueModel.$router.replace(
           {
             name: 'ChatRoom',

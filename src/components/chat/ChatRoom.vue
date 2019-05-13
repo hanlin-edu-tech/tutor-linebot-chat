@@ -5,7 +5,7 @@
                             color="success" :stroke-width="7" :size="56"></mu-circular-progress>
     </mu-flex>
     <section v-show="!isLoading">
-      <article id="dialog" ref="dialog">
+      <article id="dialog">
         <mu-flex v-for="(messageInfo, id) in messages" :key="id"
                  :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
                  :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
@@ -26,21 +26,18 @@
             <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
               <img class="chat-image" :src="messageInfo.imageUrl">
             </a>
-            <a v-show="messageInfo.fileUrl" :href="messageInfo.fileUrl" target="_blank">
-              <img class="chat-image"
-                   src="https://s3-ap-northeast-1.amazonaws.com/ehanlin-web-resource/linebot/file/file_icon.png">
-            </a>
             <article v-show="!messageInfo.imageUrl"
-                     :class="!messageInfo.ehanlinCustomerService ?
-                   'dialog-block-user' : 'dialog-block-ehanlin'">
-              <template v-for="line in messageInfo.text.split('\n')">{{line}}<br /></template>
+                     :class="!messageInfo.ehanlinCustomerService ? 'dialog-block-user' : 'dialog-block-ehanlin'">
+              <template v-for="line in messageInfo.text.split('\n')">{{ line }}<br /></template>
             </article>
           </mu-flex>
         </mu-flex>
       </article>
-      <article id="dialog-input">
+      <article id="dialog-area">
         <mu-container>
-          <mu-row style="background-color: #f1f7fe;">
+          <mu-row id="dialog-input" style="background-color: #f1f7fe;"
+                  @dragenter="dragFileEnterTarget" @dragleave="dragFileLeaveTarget"
+                  @drop="dragFileToUpload" @dragover.prevent>
             <section style="width: 75%;" v-show="!isPreviewImage">
               <mu-flex fill justify-content="start">
                 <mu-text-field v-model="messageText"
@@ -50,6 +47,8 @@
                 </mu-text-field>
               </mu-flex>
             </section>
+
+            <!-- 預覽欲傳送至使用者之圖片 (已上傳至 AWS)-->
             <section style="width: 75%; min-height: 80px;" v-show="isPreviewImage">
               <mu-flex fill justify-content="start">
                 <mu-circular-progress style="margin-top: 20px;" :size="36"
@@ -58,8 +57,8 @@
                 <img id="preview-image" class="chat-image-preview" :src="originalImageUrl">
               </mu-flex>
             </section>
-            <mu-flex class="flex-demo" fill justify-content="end">
-              <input id="upload-image" type="file" accept="image/*" @change="paintCanvas($event)"
+            <mu-flex fill justify-content="end">
+              <input id="upload-image" type="file" accept="image/*" @change="selectFileToUpload"
                      style="display: none;">
               <mu-icon class="image-control-icon" v-show="originalImageUrl" size="30" value="delete_forever"
                        @click="cancelImage"></mu-icon>
@@ -163,8 +162,6 @@
           })
           vueModel.messages = messages
 
-          // /* 稍稍等待圖片加載完成 */
-          // await vueModel.$delay(1500)
           await vueModel.listeningOnMessageAdded()
         } else {
           showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
@@ -200,9 +197,40 @@
         document.getElementById('upload-image').click()
       },
 
-      paintCanvas (event) {
+      dragFileEnterTarget (event) {
+        const vueModel = this
+        event.currentTarget.classList.add('drag-enter')
+
+        /* 紀錄拖曳檔案時，最後進入的 target */
+        vueModel.lastHierarchyDragTarget = event.target
+
+      },
+
+      dragFileLeaveTarget (event) {
+        const vueModel = this
+        if (vueModel.lastHierarchyDragTarget === event.target) {
+          event.currentTarget.classList.remove('drag-enter')
+        }
+      },
+
+      dragFileToUpload (event) {
+        const vueModel = this
+        let originalImageFile
+        event.preventDefault()
+        event.currentTarget.classList.remove('drag-enter')
+
+        originalImageFile = event.dataTransfer.files[0]
+        vueModel.paintCanvas(originalImageFile)
+      },
+
+      selectFileToUpload (event) {
         const vueModel = this
         const originalImageFile = event.target.files[0]
+        vueModel.paintCanvas(originalImageFile)
+      },
+
+      paintCanvas (originalImageFile) {
+        const vueModel = this
         const fileName = `${Math.floor(Date.now() / 1000)}_${originalImageFile.name}`
         let reader
 
@@ -374,84 +402,88 @@
     #dialog {
       height: 78vh;
       overflow: scroll;
+
+      .dialog-time {
+        color: #6a6a6a;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .dialog-text {
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .dialog-flex-left {
+        margin-left: 20px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+      }
+
+      .dialog-flex-right {
+        margin-right: 10px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+      }
+
+      .dialog-row {
+        width: 55%;
+      }
+
+      .dialog-avatar {
+        margin-top: 10px;
+        margin-bottom: 5px;
+        font-weight: 700;
+      }
+
+      .dialog-block-user {
+        background-color: #004ec4;
+        padding: 5px;
+        border-radius: 3px;
+        word-break: normal;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .dialog-block-ehanlin {
+        background-color: #f1f7fe;
+        padding: 5px;
+        border-radius: 3px;
+        word-break: normal;
+        color: #004ec4;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .chat-image {
+        width: 250px;
+        object-fit: contain;
+      }
     }
 
-    #dialog-input {
+    #dialog-area {
       padding: 5px;
-    }
 
-    .dialog-time {
-      color: #6a6a6a;
-      font-size: 11px;
-      font-weight: 500;
-    }
+      #dialog-input.drag-enter {
+        background-color: #EFFCF0 !important;
+      }
 
-    .dialog-text {
-      font-size: 11px;
-      font-weight: 600;
-    }
+      .chat-image-preview {
+        width: 110px;
+        object-fit: contain;
+      }
 
-    .dialog-flex-left {
-      margin-left: 20px;
-      margin-top: 5px;
-      margin-bottom: 5px;
-    }
+      .mu-input {
+        margin-bottom: -6px;
+      }
 
-    .dialog-flex-right {
-      margin-right: 10px;
-      margin-top: 5px;
-      margin-bottom: 5px;
-    }
-
-    .dialog-row {
-      width: 55%;
-    }
-
-    .dialog-avatar {
-      margin-top: 10px;
-      margin-bottom: 5px;
-      font-weight: 700;
-    }
-
-    .dialog-block-user {
-      background-color: #004ec4;
-      padding: 5px;
-      border-radius: 3px;
-      word-break: normal;
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .dialog-block-ehanlin {
-      background-color: #f1f7fe;
-      padding: 5px;
-      border-radius: 3px;
-      word-break: normal;
-      color: #004ec4;
-      font-size: 14px;
-      font-weight: 900;
-    }
-
-    .chat-image {
-      width: 250px;
-      object-fit: contain;
-    }
-
-    .chat-image-preview {
-      width: 110px;
-      object-fit: contain;
-    }
-
-    .mu-input {
-      margin-bottom: -6px;
-    }
-
-    .image-control-icon {
-      position: relative;
-      top: 26px;
-      left: -5px;
-      cursor: pointer;
+      .image-control-icon {
+        position: relative;
+        top: 26px;
+        left: -5px;
+        cursor: pointer;
+      }
     }
   }
 </style>

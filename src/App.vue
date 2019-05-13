@@ -1,7 +1,9 @@
 <template>
-  <mu-container>
-    <router-view></router-view>
-  </mu-container>
+  <section>
+    <mu-container>
+      <router-view></router-view>
+    </mu-container>
+  </section>
 </template>
 
 <script>
