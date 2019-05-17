@@ -10,7 +10,7 @@
 
 <script>
   import { db } from '@/modules/firebase-config'
-  import { showModal } from '@/modules/modal'
+  import showModal from '@/modules/modal'
 
   export default {
     name: 'SearchLineUser',

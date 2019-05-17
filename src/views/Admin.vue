@@ -52,6 +52,10 @@
 
   export default {
     name: 'Admin',
+    components: {
+      SearchLineUser
+    },
+
     data () {
       const vueModel = this
       return {
@@ -87,10 +91,6 @@
         },
         chatRef: db.collection('Chat'),
       }
-    },
-
-    components: {
-      SearchLineUser
     },
 
     methods: {
