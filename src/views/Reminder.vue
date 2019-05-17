@@ -5,12 +5,14 @@
 </template>
 
 <script>
-  import { db } from '@/modules/firebase-config'
   import { mapState, mapActions } from 'vuex'
+  import store from '@/store/store'
+  import { db } from '@/modules/firebase-config'
   import { auth } from '@/modules/firebase-config'
   import '@firebase/auth'
 
   export default {
+    store,
     name: 'Reminder',
     data () {
       return {
@@ -48,7 +50,7 @@
         )
     },
 
-    methods: Object.assign({}, mapActions('reminder', ['assignNotificationColorAction']))
+    methods: mapActions('reminder', ['assignNotificationColorAction'])
   }
 </script>
 

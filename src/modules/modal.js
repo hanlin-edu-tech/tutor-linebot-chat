@@ -1,4 +1,4 @@
-export function showModal (vueModel, warningText) {
+const showModal = (vueModel, warningText) => {
   vueModel.$Modal.warning({
     title: '',
     content: `<h2 style='color: #652707; margin-left: -30px'>${warningText}</h2>`,
@@ -6,3 +6,5 @@ export function showModal (vueModel, warningText) {
     okText: '了解'
   })
 }
+
+export default showModal

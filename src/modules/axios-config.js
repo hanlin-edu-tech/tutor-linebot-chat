@@ -4,7 +4,7 @@ axios.defaults.baseURL = ''
 axios.interceptors.response.use(response => response, Promise.reject)
 
 export default {
-  install: (Vue, Option) => {
+  install (Vue, Option) {
     Vue.prototype['axios'] = axios
   }
 }

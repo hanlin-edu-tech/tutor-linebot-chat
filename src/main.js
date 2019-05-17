@@ -10,8 +10,8 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-tw'
 import { Layout, Content, Sider, Modal } from 'iview'
 import { firebase } from '@/modules/firebase-config'
-import { showModal } from '@/modules/modal'
-import { util } from '@/modules/util'
+import showModal from '@/modules/modal'
+import util from '@/modules/util'
 
 import 'muse-ui/dist/muse-ui.css'
 import 'iview/dist/styles/iview.css'
@@ -35,14 +35,16 @@ Vue.prototype.$Modal = Modal
 
 dayjs.locale('zh-tw')
 Vue.prototype.$dayjs = dayjs
-Vue.prototype.$delay = (millisecond) => {
-  return new Promise(resolve => {
-    setTimeout(resolve, millisecond)
-  })
+Vue.prototype.$delay = millisecond => {
+  return new Promise(
+    resolve => {
+      setTimeout(resolve, millisecond)
+    }
+  )
 }
 
-Vue.config.errorHandler = (error, vueModel, info) => {
-  console.error(error)
+Vue.config.errorHandler = (error, vueModel) => {
+  console.error(error.message)
   showModal(vueModel, '發生錯誤囉')
 }
 

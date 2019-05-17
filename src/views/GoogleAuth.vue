@@ -14,10 +14,12 @@
 <script>
   import { db, firebase, auth } from '@/modules/firebase-config'
   import '@firebase/auth'
+  import store from '@/store/store'
   import { mapActions } from 'vuex'
-  import { showModal } from '@/modules/modal'
+  import showModal from '@/modules/modal'
 
   export default {
+    store,
     name: 'GoogleAuth',
     data () {
       return {
@@ -26,8 +28,9 @@
       }
     },
 
-    methods: Object.assign(
-      {
+    methods: {
+      ...mapActions('loginUser', ['assignLoginUserInfoAction']),
+      ...{
         async authenticate () {
           const vueModel = this
           auth.useDeviceLanguage()
@@ -52,10 +55,8 @@
         async authenticateUserByAccessFirestore () {
           await db.collection('Identity').get()
         }
-      },
-
-      mapActions('loginUser', ['assignLoginUserInfoAction'])
-    )
+      }
+    }
   }
 </script>
 
