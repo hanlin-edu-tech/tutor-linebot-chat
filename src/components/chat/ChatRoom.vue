@@ -5,7 +5,7 @@
                             color="success" :stroke-width="7" :size="56"></mu-circular-progress>
     </mu-flex>
     <section v-show="!isLoading">
-      <article id="dialog">
+      <article id="dialog-content">
         <mu-flex v-for="(messageInfo, id) in messages" :key="id"
                  :class="!messageInfo.ehanlinCustomerService ? 'dialog-flex-left' : 'dialog-flex-right'"
                  :justify-content="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
@@ -13,14 +13,14 @@
                    :align-items="!messageInfo.ehanlinCustomerService ? 'start' : 'end'">
             <mu-flex class="dialog-avatar" justify-content="start">
               <mu-avatar style="margin-right: 5px;" :size="37">
-                <img :src="!messageInfo.ehanlinCustomerService ?
-              lineUserAvatar : messageInfo.ehanlinCustomerService.avatar">
+                <img :src="!messageInfo.ehanlinCustomerService
+                ? lineUserAvatar : messageInfo.ehanlinCustomerService.avatar">
               </mu-avatar>
               <mu-flex direction="column" justify-content="start">
                 <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
                 <span class="dialog-text">
                 {{ !messageInfo.ehanlinCustomerService ? lineUserName : messageInfo.ehanlinCustomerService.name }}
-              </span>
+                </span>
               </mu-flex>
             </mu-flex>
             <a v-show="messageInfo.imageUrl" :href="messageInfo.imageUrl" target="_blank">
@@ -33,54 +33,22 @@
           </mu-flex>
         </mu-flex>
       </article>
-      <article id="dialog-area">
-        <mu-container>
-          <mu-row id="dialog-input" style="background-color: #f1f7fe;"
-                  @dragenter="dragFileEnterTarget" @dragleave="dragFileLeaveTarget"
-                  @drop="dragFileToUpload" @dragover.prevent>
-            <section style="width: 75%;" v-show="!isPreviewImage">
-              <mu-flex fill justify-content="start">
-                <mu-text-field v-model="messageText"
-                               multi-line full-width :rows="3" :rows-max="5"
-                               @keypress.enter.exact="sentMessage"
-                               underline-color="#004ec4">
-                </mu-text-field>
-              </mu-flex>
-            </section>
-
-            <!-- 預覽欲傳送至使用者之圖片 (已上傳至 AWS)-->
-            <section style="width: 75%; min-height: 80px;" v-show="isPreviewImage">
-              <mu-flex fill justify-content="start">
-                <mu-circular-progress style="margin-top: 20px;" :size="36"
-                                      v-show="isShowImageProgress">
-                </mu-circular-progress>
-                <img id="preview-image" class="chat-image-preview" :src="originalImageUrl">
-              </mu-flex>
-            </section>
-            <mu-flex fill justify-content="end">
-              <input id="upload-image" type="file" accept="image/*" @change="selectFileToUpload"
-                     style="display: none;">
-              <mu-icon class="image-control-icon" v-show="originalImageUrl" size="30" value="delete_forever"
-                       @click="cancelImage"></mu-icon>
-              <mu-icon class="image-control-icon" v-show="originalImageUrl" size="27" value="send"
-                       @click="sentImage"></mu-icon>
-              <mu-icon class="image-control-icon" size="27" value="add_photo_alternate"
-                       @click="triggerUploadImage"></mu-icon>
-            </mu-flex>
-          </mu-row>
-        </mu-container>
-      </article>
+      <DialogText :specific-line-user="specificLineUser"></DialogText>
     </section>
   </section>
 </template>
 
 <script>
-  import { db, firebase, storage } from '@/modules/firebase-config'
-  import { mapState } from 'vuex'
-  import { showModal } from '@/modules/modal'
+  import { db } from '@/modules/firebase-config'
+  import showModal from '@/modules/modal'
+  import DialogText from '@/components/chat/DialogText'
 
   export default {
     name: 'ChatRoom',
+    components: {
+      DialogText
+    },
+
     data () {
       const vueModel = this
       return {
@@ -100,8 +68,6 @@
       lineUserAvatar: String,
     },
 
-    computed: mapState('loginUser', ['loginUserInfo']),
-
     async mounted () {
       const vueModel = this
       await vueModel.initial()
@@ -118,12 +84,11 @@
       async initial () {
         const vueModel = this
         try {
-          vueModel.storageRef = storage.ref('/images/')
           vueModel.messageRef = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
           await vueModel.retrieveMessages()
           vueModel.isLoading = false
         } catch (error) {
-          console.error(error)
+          console.error(error.message)
           showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
         }
       },
@@ -134,16 +99,34 @@
       },
 
       scrollBottom () {
-        const dialogTarget = document.getElementById('dialog')
-        const imageLoaded = () => {
-          dialogTarget.scrollTop = dialogTarget.scrollHeight
-        }
-        const allImgTarget = document.querySelector('img')
+        const dialogContentTarget = document.getElementById('dialog-content')
+        dialogContentTarget.scrollTop = dialogContentTarget.scrollHeight
+      },
 
-        if (allImgTarget.complete) {
-          imageLoaded()
+      determineImageLoaded (imageUrl) {
+        const vueModel = this
+
+        if (imageUrl) {
+          const lastChatImgTarget = [...document.querySelectorAll('img.chat-image')].last()
+          const imageLoaded = () => {
+            /*
+             * 考量到有的圖片可能容量過大，所以在最後一個 img.chat-image 加載完成後，
+             * 稍稍等待 0.5 秒，再移動聊天室捲軸至最下方
+             */
+            vueModel.$delay(500)
+            vueModel.scrollBottom()
+          }
+
+          if (lastChatImgTarget.complete) {
+            imageLoaded()
+          } else {
+            lastChatImgTarget.addEventListener('load', event => {
+              imageLoaded()
+              event.currentTarget.removeEventListener('load', () => {})
+            })
+          }
         } else {
-          allImgTarget.addEventListener('load', imageLoaded)
+          vueModel.scrollBottom()
         }
       },
 
@@ -174,129 +157,27 @@
           .where('updateTime', '>', vueModel.oneMonthAgo)
           .orderBy('updateTime', 'asc')
           .limit(1000)
-          .onSnapshot(async messageQuerySnapshot => {
-            let newestMessageDoc
-            let newestMessageChange = messageQuerySnapshot.docChanges().last()
-            if (!newestMessageChange) {
-              return
+          .onSnapshot(
+            async messageQuerySnapshot => {
+              let newestMessageDoc
+              let newestMessageChange = messageQuerySnapshot.docChanges().last()
+              if (!newestMessageChange) {
+                return
+              }
+
+              if (newestMessageChange.type === 'added') {
+                newestMessageDoc = newestMessageChange.doc
+                const newestMessageId = newestMessageDoc.id
+                const newestMessage = newestMessageDoc.data()
+
+                vueModel.$set(vueModel.messages, newestMessageId, newestMessage)
+                vueModel.$nextTick(() => {
+                  vueModel.determineImageLoaded(newestMessage.imageUrl)
+                })
+                await vueModel.updateMessagesToRead()
+              }
             }
-
-            if (newestMessageChange.type === 'added') {
-              newestMessageDoc = newestMessageChange.doc
-              const newestMessageId = newestMessageDoc.id
-              const newestMessage = newestMessageDoc.data()
-
-              vueModel.$set(vueModel.messages, newestMessageId, newestMessage)
-              vueModel.$nextTick(vueModel.scrollBottom)
-              await vueModel.updateMessagesToRead()
-            }
-          })
-      },
-
-      triggerUploadImage () {
-        document.getElementById('upload-image').click()
-      },
-
-      dragFileEnterTarget (event) {
-        const vueModel = this
-        event.currentTarget.classList.add('drag-enter')
-
-        /* 紀錄拖曳檔案時，最後進入的 target */
-        vueModel.lastHierarchyDragTarget = event.target
-
-      },
-
-      dragFileLeaveTarget (event) {
-        const vueModel = this
-        if (vueModel.lastHierarchyDragTarget === event.target) {
-          event.currentTarget.classList.remove('drag-enter')
-        }
-      },
-
-      dragFileToUpload (event) {
-        const vueModel = this
-        let originalImageFile
-        event.preventDefault()
-        event.currentTarget.classList.remove('drag-enter')
-
-        originalImageFile = event.dataTransfer.files[0]
-        vueModel.paintCanvas(originalImageFile)
-      },
-
-      selectFileToUpload (event) {
-        const vueModel = this
-        const originalImageFile = event.target.files[0]
-        vueModel.paintCanvas(originalImageFile)
-      },
-
-      paintCanvas (originalImageFile) {
-        const vueModel = this
-        const fileName = `${Math.floor(Date.now() / 1000)}_${originalImageFile.name}`
-        let reader
-
-        vueModel.isPreviewImage = true
-        vueModel.isShowImageProgress = true
-        vueModel.uploadImage(fileName, originalImageFile, uploadTask => {
-          return async () => {
-            vueModel.originalImageUrl = await uploadTask.snapshot.ref.getDownloadURL()
-            vueModel.isShowImageProgress = false
-          }
-        })
-
-        reader = new FileReader()
-        reader.readAsDataURL(originalImageFile)
-        reader.onload = event => {
-          const img = new Image()
-          img.src = event.target.result
-          img.onload = () => {
-            let canvasWidth, canvasHeight, canvasElement, context
-            if (img.width <= 240 && img.height <= 240) {
-              canvasWidth = img.width
-              canvasHeight = img.height
-            } else {
-              /* 縮小比例重新繪製圖片 */
-              canvasWidth = (img.width > img.height) ? 240 : img.width / (img.height / 240)
-              canvasHeight = (img.height > img.width) ? 240 : img.height / (img.width / 240)
-            }
-            canvasElement = document.createElement('canvas')
-            canvasElement.width = canvasWidth
-            canvasElement.height = canvasHeight
-
-            context = canvasElement.getContext('2d')
-            context.drawImage(img, 0, 0, canvasWidth, canvasHeight)
-            context.canvas.toBlob(blob => {
-              const smallFileName = `small_${Math.floor(Date.now() / 1000)}_${originalImageFile.name}`
-              const smallFile = new File([blob], smallFileName, {
-                type: originalImageFile.type,
-                lastModified: Date.now()
-              })
-              vueModel.uploadImage(smallFileName, smallFile, uploadTask => {
-                return async () => {
-                  vueModel.smallImageUrl = await uploadTask.snapshot.ref.getDownloadURL()
-                }
-              })
-            }, originalImageFile.type, 1)
-          }
-        }
-        reader.onerror = console.error
-      },
-
-      uploadImage (fileName, imageFile, completeFn) {
-        const vueModel = this
-        const metadata = {
-          contentType: imageFile.type
-        }
-        const uploadTask = vueModel.storageRef.child(fileName).put(imageFile, metadata)
-        uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED,
-          snapshot => {},
-          error => {},
-          completeFn(uploadTask))
-      },
-
-      cancelImage () {
-        const vueModel = this
-        vueModel.originalImageUrl = ''
-        vueModel.isPreviewImage = false
+          )
       },
 
       async updateMessagesToRead () {
@@ -312,84 +193,7 @@
             batch.update(vueModel.messageRef.doc(id), { read: true })
           })
         }
-
         await batch.commit()
-      },
-
-      async pushChatMessage (lineUserId, {
-        messageText = '使用者傳送一張圖片',
-        originalImageUrl = '',
-        smallImageUrl = ''
-      } = {}) {
-        const vueModel = this
-        const OK_200 = 200
-        let response = await vueModel
-          .axios({
-            method: 'post',
-            url: 'https://www.ehanlin.com.tw/linebot/admin/pushChatMessage',
-            data: {
-              lineUserId: lineUserId,
-              messageText: messageText,
-              originalContentUrl: originalImageUrl,
-              previewImageUrl: smallImageUrl
-            }
-          })
-
-        if (response.status === OK_200) {
-          vueModel.messageText = ''
-          await vueModel.createMessage({
-            messageText: messageText,
-            originalImageUrl: originalImageUrl
-          })
-        } else {
-          showModal(vueModel, '傳送訊息失敗，請稍後再嘗試！')
-        }
-      },
-
-      async createMessage (
-        {
-          messageText = '使用者傳送一張圖片',
-          originalImageUrl = '',
-        } = {}) {
-        const vueModel = this
-        let updateTime = firebase.firestore.Timestamp.fromDate(new Date())
-        let loginUserInfo = vueModel.loginUserInfo
-        let message = {
-          text: messageText,
-          updateTime: updateTime,
-          read: true,
-          ehanlinCustomerService: {
-            account: loginUserInfo.email,
-            name: loginUserInfo.name,
-            avatar: loginUserInfo.avatar
-          }
-        }
-
-        if (originalImageUrl) {
-          message.imageUrl = originalImageUrl
-        }
-
-        await vueModel.messageRef.add(message)
-      },
-
-      async sentMessage (event) {
-        const vueModel = this
-        if (vueModel.messageText === '') {
-          return
-        }
-        event.preventDefault()
-        await vueModel.pushChatMessage(vueModel.specificLineUser,
-          { messageText: vueModel.messageText })
-      },
-
-      async sentImage () {
-        const vueModel = this
-        await vueModel.pushChatMessage(vueModel.specificLineUser,
-          {
-            originalImageUrl: vueModel.originalImageUrl,
-            smallImageUrl: vueModel.smallImageUrl
-          })
-        vueModel.cancelImage()
       }
     }
   }
@@ -399,20 +203,9 @@
   #chat-room {
     font-size: 13px;
 
-    #dialog {
+    #dialog-content {
       height: 78vh;
       overflow: scroll;
-
-      .dialog-time {
-        color: #6a6a6a;
-        font-size: 11px;
-        font-weight: 500;
-      }
-
-      .dialog-text {
-        font-size: 11px;
-        font-weight: 600;
-      }
 
       .dialog-flex-left {
         margin-left: 20px;
@@ -428,61 +221,48 @@
 
       .dialog-row {
         width: 55%;
-      }
 
-      .dialog-avatar {
-        margin-top: 10px;
-        margin-bottom: 5px;
-        font-weight: 700;
-      }
+        a > img.chat-image {
+          width: 250px;
+          object-fit: contain;
+        }
 
-      .dialog-block-user {
-        background-color: #004ec4;
-        padding: 5px;
-        border-radius: 3px;
-        word-break: normal;
-        color: white;
-        font-size: 14px;
-        font-weight: 600;
-      }
+        .dialog-avatar {
+          margin-top: 10px;
+          margin-bottom: 5px;
+          font-weight: 700;
 
-      .dialog-block-ehanlin {
-        background-color: #f1f7fe;
-        padding: 5px;
-        border-radius: 3px;
-        word-break: normal;
-        color: #004ec4;
-        font-size: 14px;
-        font-weight: 900;
-      }
+          .dialog-time {
+            color: #6a6a6a;
+            font-size: 11px;
+            font-weight: 500;
+          }
 
-      .chat-image {
-        width: 250px;
-        object-fit: contain;
-      }
-    }
+          .dialog-text {
+            font-size: 11px;
+            font-weight: 600;
+          }
+        }
 
-    #dialog-area {
-      padding: 5px;
+        .dialog-block-user {
+          background-color: #004ec4;
+          padding: 5px;
+          border-radius: 3px;
+          word-break: normal;
+          color: white;
+          font-size: 14px;
+          font-weight: 600;
+        }
 
-      #dialog-input.drag-enter {
-        background-color: #EFFCF0 !important;
-      }
-
-      .chat-image-preview {
-        width: 110px;
-        object-fit: contain;
-      }
-
-      .mu-input {
-        margin-bottom: -6px;
-      }
-
-      .image-control-icon {
-        position: relative;
-        top: 26px;
-        left: -5px;
-        cursor: pointer;
+        .dialog-block-ehanlin {
+          background-color: #f1f7fe;
+          padding: 5px;
+          border-radius: 3px;
+          word-break: normal;
+          color: #004ec4;
+          font-size: 14px;
+          font-weight: 900;
+        }
       }
     }
   }

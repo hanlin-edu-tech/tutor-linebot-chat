@@ -67,7 +67,7 @@
 <script>
   import SearchLineUser from '@/components/SearchLineUser'
   import { db, firebase } from '@/modules/firebase-config'
-  import { showModal } from '@/modules/modal'
+  import showModal from '@/modules/modal'
 
   export default {
     name: 'ChatUsersList',
@@ -97,13 +97,9 @@
 
     async mounted () {
       const vueModel = this
-      try {
-        await vueModel.initialUsersList()
-        vueModel.listeningOnChatAdded()
-        vueModel.listeningOnIdentityUpsert()
-      } catch (error) {
-        console.error(error)
-      }
+      await vueModel.initialUsersList()
+      vueModel.listeningOnChatAdded()
+      vueModel.listeningOnIdentityUpsert()
     },
 
     methods: {
