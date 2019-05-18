@@ -4,7 +4,7 @@
       <mu-col span="5">
         <article class="line-emoji">
           <div v-for="lineEmoji in lineEmojis" :key="lineEmoji.img"
-               @click="selectLineEmoji"
+               @click="selectLineEmoji($event, lineEmoji)"
                :data-emoji-path="lineEmoji.path" :data-emoji-unicode="lineEmoji.unicode"></div>
         </article>
       </mu-col>
@@ -43,6 +43,7 @@
       return {
         lineEmojis: [
           {
+            expression: '(:love-heart:)',
             path: require('@/static/img/line-emoji/love-heart.png'),
             unicode: '0x100078'
           },
@@ -126,16 +127,18 @@
       }
     },
     methods: {
-      ...mapActions('lineStickerEmoji', ['assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
+      ...mapActions('lineStickerEmoji',
+        ['assignExpressionAction', 'assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
       ...{
-        selectLineEmoji (event) {
+        selectLineEmoji (event, lineEmoji) {
           const vueModel = this
           const dataSet = event.currentTarget.dataset
           const emojiPath = dataSet.emojiPath
           const emojiUnicode = dataSet.emojiUnicode
-          vueModel.$Modal.remove()
-          vueModel.assignLineStickerEmojiPathAction(emojiPath)
-          vueModel.assignEmojiUnicodeAction(emojiUnicode)
+          vueModel.$modal.remove()
+          vueModel.assignExpressionAction(lineEmoji.expression)
+          vueModel.assignLineStickerEmojiPathAction(lineEmoji.path)
+          vueModel.assignEmojiUnicodeAction(lineEmoji.emojiUnicode)
         }
       }
     }

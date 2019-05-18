@@ -10,7 +10,6 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-tw'
 import { Layout, Content, Sider, Modal } from 'iview'
 import { firebase } from '@/modules/firebase-config'
-import showModal from '@/modules/modal'
 import util from '@/modules/util'
 
 import 'muse-ui/dist/muse-ui.css'
@@ -31,7 +30,33 @@ Vue.use(VueGoodTablePlugin)
 Vue.component('Layout', Layout)
 Vue.component('Content', Content)
 Vue.component('Sider', Sider)
-Vue.prototype.$Modal = Modal
+
+Vue.prototype.$modal = {
+  show ({
+          title = '',
+          text = '',
+          width = '350px',
+          okText = '了解',
+          render = null
+        } = {}) {
+    const config = {
+      title: title,
+      content: `<h2 style='color: #652707; margin-left: -30px'>${text}</h2>`,
+      width: width,
+      okText: okText,
+    }
+
+    if (render) {
+      config.render = render
+    }
+
+    Modal.info(config)
+  },
+
+  remove () {
+    Modal.remove()
+  }
+}
 
 dayjs.locale('zh-tw')
 Vue.prototype.$dayjs = dayjs
@@ -45,7 +70,9 @@ Vue.prototype.$delay = millisecond => {
 
 Vue.config.errorHandler = (error, vueModel) => {
   console.error(error.message)
-  showModal(vueModel, '發生錯誤囉')
+  vueModel.$modal.show({
+    text: '發生錯誤囉！'
+  })
 }
 
 router.beforeEach((to, from, next) => {

@@ -67,7 +67,7 @@
 <script>
   import SearchLineUser from '@/components/SearchLineUser'
   import { db, firebase } from '@/modules/firebase-config'
-  import showModal from '@/modules/modal'
+  import { ErrorText, IdentityText } from '@/modules/modal-text'
 
   export default {
     name: 'ChatUsersList',
@@ -112,9 +112,13 @@
         const vueModel = this
         try {
           await db.collection('Identity').doc(lineUserId).delete()
-          showModal(vueModel, '成功刪除識別')
+          vueModel.$modal.show({
+            text: IdentityText.SUCCESS
+          })
         } catch (error) {
-          showModal(vueModel, '刪除識別發生錯誤')
+          vueModel.$modal.show({
+            text: ErrorText.EXCEPTION
+          })
         }
       },
 
@@ -325,25 +329,25 @@
           .where('updateTime', '>=', vueModel.oneMonthAgo)
           .orderBy('updateTime', 'asc')
           .onSnapshot(
-          async chatQuerySnapshot => {
-            let chatNewestChange = chatQuerySnapshot.docChanges().last()
-            if (chatNewestChange.type === 'added') {
-              const lineUserId = chatNewestChange.doc.id
-              const lineUserProfile = chatNewestChange.doc.data()
-              if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
-                const messageDocs = await vueModel.retrieveSpecificMessageDocs(lineUserId)
-                const newestMessage = messageDocs.last().data()
+            async chatQuerySnapshot => {
+              let chatNewestChange = chatQuerySnapshot.docChanges().last()
+              if (chatNewestChange.type === 'added') {
+                const lineUserId = chatNewestChange.doc.id
+                const lineUserProfile = chatNewestChange.doc.data()
+                if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
+                  const messageDocs = await vueModel.retrieveSpecificMessageDocs(lineUserId)
+                  const newestMessage = messageDocs.last().data()
 
-                /* 新的使用者傳入訊息 */
-                let newUserMessageInfo = {}
-                newUserMessageInfo[lineUserId] =
-                  await vueModel.composeMessageInfo(lineUserId, lineUserProfile, newestMessage, messageDocs)
-                vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
-                vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
+                  /* 新的使用者傳入訊息 */
+                  let newUserMessageInfo = {}
+                  newUserMessageInfo[lineUserId] =
+                    await vueModel.composeMessageInfo(lineUserId, lineUserProfile, newestMessage, messageDocs)
+                  vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
+                  vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
+                }
               }
             }
-          }
-        )
+          )
       },
 
       entryChatRoom (messageInfo, lineUserId) {
@@ -377,7 +381,9 @@
 
         vueModel.$refs[lineUserId][0].$refs['input'].value = ''
         if (!messageInfo.identity || messageInfo.identity.length === 0) {
-          showModal(vueModel, '使用者識別不能為空值')
+          vueModel.$modal.show({
+            text: IdentityText.QUERY_EMPTY
+          })
           return
         }
 
@@ -386,7 +392,9 @@
           .get()
 
         if (!identityQuerySnapshot.empty) {
-          showModal(vueModel, '唯一識別已存在於其他使用者')
+          vueModel.$modal.show({
+            text: IdentityText.EXISTED_WARNING
+          })
           return
         }
 

@@ -12,19 +12,18 @@
 </template>
 
 <script>
-  import { db, firebase, auth } from '@/modules/firebase-config'
-  import '@firebase/auth'
   import store from '@/store/store'
   import { mapActions } from 'vuex'
-  import showModal from '@/modules/modal'
+  import { db, firebase, auth } from '@/modules/firebase-config'
+  import '@firebase/auth'
+  import { AuthText } from '@/modules/modal-text'
 
   export default {
     store,
     name: 'GoogleAuth',
     data () {
       return {
-        authorizedEmails: [],
-        warningText: '使用者沒有權限'
+        authorizedEmails: []
       }
     },
 
@@ -47,7 +46,9 @@
             })
             vueModel.$router.push(`/chat/space`)
           } catch (error) {
-            showModal(vueModel, vueModel.warningText)
+            vueModel.$modal.show({
+              text: AuthText.WARNING
+            })
             auth.signOut()
           }
         },

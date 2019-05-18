@@ -1,7 +1,7 @@
 export default {
   namespaced: true,
   state: {
-    loginUserInfo: Object
+    loginUserInfo: Object.create(null)
   },
 
   actions: {

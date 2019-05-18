@@ -11,9 +11,9 @@
     methods: {
       showLineStickerEmojiModal () {
         const vueModel = this
-        vueModel.$Modal.info({
+        vueModel.$modal.show({
           width: '650px',
-          okText:'取消',
+          okText: '取消',
           render: createElement => createElement(LineStickerEmojiModal)
         })
       }

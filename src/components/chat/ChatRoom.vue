@@ -39,8 +39,8 @@
 </template>
 
 <script>
+  import { ChatRoomText } from '@/modules/modal-text'
   import { db } from '@/modules/firebase-config'
-  import showModal from '@/modules/modal'
   import DialogText from '@/components/chat/DialogText'
 
   export default {
@@ -63,9 +63,9 @@
     },
 
     props: {
-      specificLineUser: String,
-      lineUserName: String,
-      lineUserAvatar: String,
+      specificLineUser: '',
+      lineUserName: '',
+      lineUserAvatar: '',
     },
 
     async mounted () {
@@ -89,7 +89,9 @@
           vueModel.isLoading = false
         } catch (error) {
           console.error(error.message)
-          showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
+          vueModel.$modal.show({
+            text: ChatRoomText.DISABLED
+          })
         }
       },
 
@@ -132,23 +134,24 @@
 
       async retrieveMessages () {
         const vueModel = this
-        if (vueModel.specificLineUser) {
-          let messageQuerySnapshot = await vueModel.messageRef
-            .where('updateTime', '>', vueModel.oneMonthAgo)
-            .orderBy('updateTime', 'asc')
-            .limit(500)
-            .get()
-
-          let messages = {}
-          messageQuerySnapshot.forEach(messageDoc => {
-            messages[messageDoc.id] = messageDoc.data()
-          })
-          vueModel.messages = messages
-
-          await vueModel.listeningOnMessageAdded()
-        } else {
-          showModal(vueModel, '聊天室暫時無法使用！請稍後再試！')
+        if (!vueModel.specificLineUser) {
+          throw 'LineUser is not found'
         }
+
+        let messageQuerySnapshot = await vueModel.messageRef
+          .where('updateTime', '>', vueModel.oneMonthAgo)
+          .orderBy('updateTime', 'asc')
+          .limit(500)
+          .get()
+
+        let messages = {}
+        messageQuerySnapshot.forEach(messageDoc => {
+          messages[messageDoc.id] = messageDoc.data()
+        })
+        vueModel.messages = messages
+
+        await vueModel.listeningOnMessageAdded()
+
       },
 
       async listeningOnMessageAdded () {
@@ -223,7 +226,8 @@
         width: 55%;
 
         a > img.chat-image {
-          width: 250px;
+          min-width: 50px;
+          max-width: 250px;
           object-fit: contain;
         }
 

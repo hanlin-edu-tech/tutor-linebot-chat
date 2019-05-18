@@ -1,11 +1,16 @@
 export default {
   namespaced: true,
   state: {
+    expression: '',
     lineStickerEmojiPath: '',
     emojiUnicode: ''
   },
 
   actions: {
+    assignExpressionAction ({ commit }, expression) {
+      commit('assignExpression', expression)
+    },
+
     assignLineStickerEmojiPathAction ({ commit }, lineStickerEmojiPath) {
       commit('assignLineStickerEmojiPath', lineStickerEmojiPath)
     },
@@ -16,6 +21,10 @@ export default {
   },
 
   mutations: {
+    assignExpression (state, expression) {
+      state.expression = expression
+    },
+
     assignLineStickerEmojiPath (state, lineStickerEmojiPath) {
       state.lineStickerEmojiPath = lineStickerEmojiPath
     },

@@ -44,8 +44,8 @@
 <script>
   import store from '@/store/store'
   import { mapState, mapActions } from 'vuex'
+  import { ChatRoomText } from '@/modules/modal-text'
   import { firebase, db, storage } from '@/modules/firebase-config'
-  import showModal from '@/modules/modal'
   import MessageCategory from '@/modules/message-category'
   import LineStickerEmojiButton from '@/components/chat/LineStickerEmojiButton'
 
@@ -63,7 +63,7 @@
     },
 
     props: {
-      specificLineUser: String
+      specificLineUser: ''
     },
 
     components: {
@@ -72,14 +72,15 @@
 
     computed: {
       ...mapState('loginUser', ['loginUserInfo']),
-      ...mapState('lineStickerEmoji', ['lineStickerEmojiPath', 'emojiUnicode'])
+      ...mapState('lineStickerEmoji', ['expression', 'lineStickerEmojiPath', 'emojiUnicode'])
     },
 
     watch: {
-      lineStickerEmojiPath (value) {
+      expression (value) {
         const vueModel = this
         if (value) {
-          vueModel.isPreviewImage = true
+          vueModel.messageText += value
+          //vueModel.isPreviewImage = true
         }
       }
     },
@@ -91,7 +92,8 @@
     },
 
     methods: {
-      ...mapActions('lineStickerEmoji', ['assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
+      ...mapActions('lineStickerEmoji',
+        ['assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
       ...{
         triggerUploadImage () {
           const vueModel = this
@@ -124,10 +126,11 @@
               .child(fileName)
               .put(imageFile, metadata)
               .then(completeFn)
-
           } catch (error) {
             console.error(error.message)
-            showModal(vueModel, '上傳檔案發生錯誤')
+            vueModel.$modal.show({
+              text: ChatRoomText.UPLOAD_IMAGE_FAILED
+            })
           }
         },
 
@@ -177,7 +180,12 @@
               }, originalImageFile.type, 1)
             }
           }
-          reader.onerror = showModal.bind(showModal, vueModel, '繪製 canvas 發生錯誤')
+
+          reader.onerror = vueModel.$modal.show.bind(vueModel.$modal.show,
+            {
+              text: ChatRoomText.PAINTING_CANVAS_FAILED
+            }
+          )
         },
 
         dragFileToUpload (event) {
@@ -199,6 +207,7 @@
 
         clear () {
           const vueModel = this
+          vueModel.messageText = ''
           vueModel.isPreviewImage = false
           vueModel.originalImageUrl = ''
           vueModel.previewImageUrl = ''
@@ -210,7 +219,7 @@
         async createMessage (
           {
             messageText = '使用者傳送一張圖片',
-            imageUrl = '',
+            imageUrl = ''
           } = {}) {
           const vueModel = this
           let updateTime = firebase.firestore.Timestamp.fromDate(new Date())
@@ -240,42 +249,51 @@
           lineStickerEmojiPath = '',
           messageCategory = MessageCategory.TEXT
         } = {}) {
-          if (messageText.trim() === '') {
-            showModal(vueModel, '訊息不能為空喔！')
-          }
           const vueModel = this
-          const OK_200 = 200
-          let response
+          if (messageText.trim() === '') {
+            vueModel.$modal.show({
+              text: ChatRoomText.MESSAGE_EMPTY
+            })
+          }
           event.preventDefault()
 
-          response = await vueModel
-            .axios({
-              method: 'post',
-              url: 'http://localhost:8080/linebot/admin/pushChatMessage',
-              data: {
-                lineUserId: lineUserId,
-                messageText: messageText,
-                originalImageUrl: originalImageUrl,
-                previewImageUrl: previewImageUrl,
-                lineStickerEmojiPath: lineStickerEmojiPath,
-                messageCategory: messageCategory
-              }
-            })
+          try {
+            await vueModel
+              .axios({
+                method: 'post',
+                url: 'http://localhost:8080/linebot/admin/pushChatMessage',
+                data: {
+                  lineUserId: lineUserId,
+                  messageText: messageText,
+                  originalImageUrl: originalImageUrl,
+                  previewImageUrl: previewImageUrl,
+                  lineStickerEmojiPath: lineStickerEmojiPath,
+                  messageCategory: messageCategory
+                }
+              })
 
-          if (response.status === OK_200) {
-            vueModel.messageText = ''
             await vueModel.createMessage({
               messageText: messageText,
               imageUrl: (originalImageUrl || lineStickerEmojiPath)
             })
-          } else {
-            showModal(vueModel, '傳送訊息失敗，請稍後再嘗試！')
+          } catch (error) {
+            if (error.response) {
+              const {
+                status,
+                statusText
+              } = error.response
+              console.error(`Fail to send message: ${status} ${statusText}`)
+            }
+            vueModel.$modal.show({
+              text: ChatRoomText.MESSAGE_SENT_FAILED
+            })
           }
           vueModel.clear()
         },
 
         determinePushChatMessage (event) {
           const vueModel = this
+
           if (vueModel.originalImageUrl && !vueModel.lineStickerEmojiPath) {
             vueModel.pushChatMessage(event, vueModel.specificLineUser,
               {
@@ -287,7 +305,7 @@
           } else if (!vueModel.originalImageUrl && vueModel.lineStickerEmojiPath) {
             vueModel.pushChatMessage(event, vueModel.specificLineUser,
               {
-                messageText: vueModel.messageText,
+                messageText: vueModel.emojiUnicode,
                 lineStickerEmojiPath: vueModel.lineStickerEmojiPath,
                 messageCategory: MessageCategory.EMOJI
               })

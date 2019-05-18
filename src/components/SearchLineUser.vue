@@ -9,8 +9,8 @@
 </template>
 
 <script>
+  import { IdentityText } from '@/modules/modal-text'
   import { db } from '@/modules/firebase-config'
-  import showModal from '@/modules/modal'
 
   export default {
     name: 'SearchLineUser',
@@ -34,10 +34,11 @@
 
         let lineUserId = ''
         if (identityQuerySnapshot.empty) {
-          showModal(vueModel, '查無此使用者識別')
+          vueModel.$modal.show({
+            text: IdentityText.NOT_FOUND
+          })
           return
         }
-
 
         identityQuerySnapshot.forEach(identityDoc => {
           lineUserId = identityDoc.id
