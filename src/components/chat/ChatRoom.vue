@@ -18,7 +18,7 @@
               </mu-avatar>
               <mu-flex direction="column" justify-content="start">
                 <span class="dialog-time">{{ formatUpdateTime (messageInfo.updateTime) }}</span>
-                <span class="dialog-text">
+                <span class="dialog-owner">
                 {{ !messageInfo.ehanlinCustomerService ? lineUserName : messageInfo.ehanlinCustomerService.name }}
                 </span>
               </mu-flex>
@@ -27,7 +27,7 @@
               <img class="chat-image" :src="messageInfo.imageUrl">
             </a>
             <article v-show="!messageInfo.imageUrl"
-                     :class="!messageInfo.ehanlinCustomerService ? 'dialog-block-user' : 'dialog-block-ehanlin'">
+                     :class="!messageInfo.ehanlinCustomerService ? 'dialog-text-block-user' : 'dialog-text-block-ehanlin'">
               <template v-for="line in messageInfo.text.split('\n')">{{ line }}<br /></template>
             </article>
           </mu-flex>
@@ -227,14 +227,13 @@
 
         a > img.chat-image {
           min-width: 50px;
-          max-width: 250px;
+          max-width: 200px;
           object-fit: contain;
         }
 
         .dialog-avatar {
           margin-top: 10px;
           margin-bottom: 5px;
-          font-weight: 700;
 
           .dialog-time {
             color: #6a6a6a;
@@ -242,13 +241,13 @@
             font-weight: 500;
           }
 
-          .dialog-text {
+          .dialog-owner {
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 900;
           }
         }
 
-        .dialog-block-user {
+        .dialog-text-block-user {
           background-color: #004ec4;
           padding: 5px;
           border-radius: 3px;
@@ -258,7 +257,7 @@
           font-weight: 600;
         }
 
-        .dialog-block-ehanlin {
+        .dialog-text-block-ehanlin {
           background-color: #f1f7fe;
           padding: 5px;
           border-radius: 3px;

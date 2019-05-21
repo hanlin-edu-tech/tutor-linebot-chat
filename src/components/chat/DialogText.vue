@@ -9,7 +9,8 @@
             <mu-text-field v-model="messageText"
                            multi-line full-width :rows="3" :rows-max="3"
                            @keypress.enter.exact="pushChatMessage($event, specificLineUser, {
-                            messageText: messageText
+                            messageText: messageText,
+                            emojisUnicode: emojisUnicode
                            })"
                            underline-color="#004ec4">
             </mu-text-field>
@@ -20,8 +21,8 @@
                                   v-show="isShowImageProgress">
             </mu-circular-progress>
             <img ref="chat-image-preview"
-                 :class="{ 'chat-image-preview': originalImageUrl, 'line-sticker-emoji-preview': lineStickerEmojiPath }"
-                 :src="originalImageUrl || lineStickerEmojiPath">
+                 :class="{ 'chat-image-preview': originalImageUrl, 'line-sticker-preview': lineSticker.path }"
+                 :src="originalImageUrl || lineSticker.path">
           </section>
 
           <input ref="upload-image" type="file" accept="image/*" style="display: none;"
@@ -58,7 +59,8 @@
         isPreviewImage: false,
         isShowImageProgress: false,
         originalImageUrl: '',
-        previewImageUrl: ''
+        previewImageUrl: '',
+        emojisUnicode: []
       }
     },
 
@@ -72,15 +74,26 @@
 
     computed: {
       ...mapState('loginUser', ['loginUserInfo']),
-      ...mapState('lineStickerEmoji', ['expression', 'lineStickerEmojiPath', 'emojiUnicode'])
+      ...mapState('lineStickerEmoji', ['lineEmoji', 'lineSticker'])
     },
 
     watch: {
-      expression (value) {
+      lineEmoji (objectSelf) {
         const vueModel = this
-        if (value) {
-          vueModel.messageText += value
-          //vueModel.isPreviewImage = true
+        if (objectSelf.expression) {
+          vueModel.messageText += objectSelf.expression
+          vueModel.emojisUnicode.push(objectSelf.unicode)
+          vueModel.$nextTick(() => {
+              vueModel.assignLineEmojiAction(Object.create(null))
+            }
+          )
+        }
+      },
+
+      lineSticker (objectSelf) {
+        const vueModel = this
+        if (objectSelf.stickerId) {
+          vueModel.isPreviewImage = true
         }
       }
     },
@@ -92,8 +105,7 @@
     },
 
     methods: {
-      ...mapActions('lineStickerEmoji',
-        ['assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
+      ...mapActions('lineStickerEmoji', ['assignLineEmojiAction', 'assignLineStickerAction']),
       ...{
         triggerUploadImage () {
           const vueModel = this
@@ -208,12 +220,13 @@
         clear () {
           const vueModel = this
           vueModel.messageText = ''
+          vueModel.emojisUnicode = []
           vueModel.isPreviewImage = false
           vueModel.originalImageUrl = ''
           vueModel.previewImageUrl = ''
-          vueModel.assignLineStickerEmojiPathAction('')
-          vueModel.assignEmojiUnicodeAction('')
           vueModel.$refs['upload-image'].value = ''
+          vueModel.assignLineEmojiAction(Object.create(null))
+          vueModel.assignLineStickerAction(Object.create(null))
         },
 
         async createMessage (
@@ -244,9 +257,15 @@
 
         async pushChatMessage (event, lineUserId, {
           messageText = '',
+          // image
           originalImageUrl = '',
           previewImageUrl = '',
-          lineStickerEmojiPath = '',
+
+          // Line sticker
+          packageId = '',
+          stickerId = '',
+
+          emojisUnicode = [],
           messageCategory = MessageCategory.TEXT
         } = {}) {
           const vueModel = this
@@ -261,20 +280,22 @@
             await vueModel
               .axios({
                 method: 'post',
-                url: 'http://localhost:8080/linebot/admin/pushChatMessage',
+                url: 'https://www.ehanlin.com.tw/linebot/admin/pushChatMessage',
                 data: {
                   lineUserId: lineUserId,
                   messageText: messageText,
                   originalImageUrl: originalImageUrl,
                   previewImageUrl: previewImageUrl,
-                  lineStickerEmojiPath: lineStickerEmojiPath,
+                  packageId: packageId,
+                  stickerId: stickerId,
+                  emojisUnicode: emojisUnicode,
                   messageCategory: messageCategory
                 }
               })
 
             await vueModel.createMessage({
               messageText: messageText,
-              imageUrl: (originalImageUrl || lineStickerEmojiPath)
+              imageUrl: originalImageUrl || vueModel.lineSticker.path
             })
           } catch (error) {
             if (error.response) {
@@ -294,7 +315,7 @@
         determinePushChatMessage (event) {
           const vueModel = this
 
-          if (vueModel.originalImageUrl && !vueModel.lineStickerEmojiPath) {
+          if (vueModel.originalImageUrl && !vueModel.lineSticker.path) {
             vueModel.pushChatMessage(event, vueModel.specificLineUser,
               {
                 messageText: '使用者傳送一張圖片',
@@ -302,12 +323,13 @@
                 previewImageUrl: vueModel.previewImageUrl,
                 messageCategory: MessageCategory.IMAGE
               })
-          } else if (!vueModel.originalImageUrl && vueModel.lineStickerEmojiPath) {
+          } else if (!vueModel.originalImageUrl && vueModel.lineSticker.path) {
             vueModel.pushChatMessage(event, vueModel.specificLineUser,
               {
-                messageText: vueModel.emojiUnicode,
-                lineStickerEmojiPath: vueModel.lineStickerEmojiPath,
-                messageCategory: MessageCategory.EMOJI
+                messageText: '使用者傳送貼圖',
+                packageId: vueModel.lineSticker.packageId,
+                stickerId: vueModel.lineSticker.stickerId,
+                messageCategory: MessageCategory.STICKER
               })
           }
         }
@@ -343,7 +365,7 @@
           object-fit: contain;
         }
 
-        img.line-sticker-emoji-preview {
+        img.line-sticker-preview {
           width: 50px;
           object-fit: contain;
         }

@@ -1,36 +1,27 @@
 export default {
   namespaced: true,
   state: {
-    expression: '',
-    lineStickerEmojiPath: '',
-    emojiUnicode: ''
+    lineEmoji: {},
+    lineSticker: {}
   },
 
   actions: {
-    assignExpressionAction ({ commit }, expression) {
-      commit('assignExpression', expression)
+    assignLineEmojiAction ({ commit }, lineEmoji) {
+      commit('assignLineEmoji', lineEmoji)
     },
 
-    assignLineStickerEmojiPathAction ({ commit }, lineStickerEmojiPath) {
-      commit('assignLineStickerEmojiPath', lineStickerEmojiPath)
-    },
-
-    assignEmojiUnicodeAction ({ commit }, emojiUnicode) {
-      commit('assignEmojiUnicode', emojiUnicode)
+    assignLineStickerAction ({ commit }, lineSticker) {
+      commit('assignLineSticker', lineSticker)
     }
   },
 
   mutations: {
-    assignExpression (state, expression) {
-      state.expression = expression
+    assignLineEmoji (state, lineEmoji) {
+      state.lineEmoji = lineEmoji
     },
 
-    assignLineStickerEmojiPath (state, lineStickerEmojiPath) {
-      state.lineStickerEmojiPath = lineStickerEmojiPath
-    },
-
-    assignEmojiUnicode (state, emojiUnicode) {
-      state.emojiUnicode = emojiUnicode
+    assignLineSticker (state, lineSticker) {
+      state.lineSticker = lineSticker
     }
   }
 }

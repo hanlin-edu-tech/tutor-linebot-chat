@@ -21,12 +21,6 @@
   export default {
     store,
     name: 'GoogleAuth',
-    data () {
-      return {
-        authorizedEmails: []
-      }
-    },
-
     methods: {
       ...mapActions('loginUser', ['assignLoginUserInfoAction']),
       ...{

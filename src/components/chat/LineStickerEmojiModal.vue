@@ -3,27 +3,16 @@
     <mu-row>
       <mu-col span="5">
         <article class="line-emoji">
-          <div v-for="lineEmoji in lineEmojis" :key="lineEmoji.img"
-               @click="selectLineEmoji($event, lineEmoji)"
-               :data-emoji-path="lineEmoji.path" :data-emoji-unicode="lineEmoji.unicode"></div>
+          <div v-for="lineEmoji in lineEmojis" :key="lineEmoji.unicode"
+               @click.once="selectLineEmoji($event, lineEmoji)">
+          </div>
         </article>
       </mu-col>
       <mu-col span="7">
         <article class="line-sticker">
-          <div>
-            <img :src="require('@/static/img/line-sticker/ok.png')" />
-          </div>
-          <div>
-            <img :src="require('@/static/img/line-sticker/thank-you.png')" />
-          </div>
-          <div>
-            <img :src="require('@/static/img/line-sticker/bye.png')" />
-          </div>
-          <div>
-            <img :src="require('@/static/img/line-sticker/not-see.png')" />
-          </div>
-          <div>
-            <img :src="require('@/static/img/line-sticker/sorry.png')" />
+          <div v-for="lineSticker in lineStickers" :key="lineSticker.stickerId"
+               @click.once="selectLineSticker($event, lineSticker)">
+            <img :src="lineSticker.path" />
           </div>
           <div></div>
         </article>
@@ -43,102 +32,148 @@
       return {
         lineEmojis: [
           {
-            expression: '(:love-heart:)',
-            path: require('@/static/img/line-emoji/love-heart.png'),
+            path: require('@/static/img/line-emoji/moon-heart-eyes.png'),
+            expression: '(:moon-heart-eyes:)',
             unicode: '0x100078'
           },
           {
-            path: require('@/static/img/line-emoji/laugh.png'),
+            path: require('@/static/img/line-emoji/moon-laugh.png'),
+            expression: '(:moon-laugh:)',
             unicode: '0x100079'
           },
           {
-            path: require('@/static/img/line-emoji/cute.png'),
+            path: require('@/static/img/line-emoji/moon-pleading.png'),
+            expression: '(:moon-pleading:)',
             unicode: '0x10007A'
           },
           {
-            path: require('@/static/img/line-emoji/horrified.png'),
+            path: require('@/static/img/line-emoji/moon-shocked.png'),
+            expression: '(:moon-shocked:)',
             unicode: '0x10007B'
           },
           {
-            path: require('@/static/img/line-emoji/cry.png'),
+            path: require('@/static/img/line-emoji/moon-cry.png'),
+            expression: '(:moon-cry:)',
             unicode: '0x10007C'
           },
           {
-            path: require('@/static/img/line-emoji/oh-my-god.png'),
+            path: require('@/static/img/line-emoji/moon-gaunt.png'),
+            expression: '(:moon-gaunt:)',
             unicode: '0x10007D'
           },
           {
-            path: require('@/static/img/line-emoji/angry.png'),
+            path: require('@/static/img/line-emoji/moon-furious.png'),
+            expression: '(:moon-furious:)',
             unicode: '0x10007E'
           },
           {
-            path: require('@/static/img/line-emoji/rabbit-smile.png'),
+            path: require('@/static/img/line-emoji/cony-laugh.png'),
+            expression: '(:cony-laugh:)',
             unicode: '0x10007F'
           },
           {
-            path: require('@/static/img/line-emoji/rabbit-appreciate.png'),
+            path: require('@/static/img/line-emoji/cony-sparkling-eyes.png'),
+            expression: '(:cony-sparkling-eyes:)',
             unicode: '0x100080'
           },
           {
-            path: require('@/static/img/line-emoji/rabbit-kiss.png'),
+            path: require('@/static/img/line-emoji/cony-kiss.png'),
+            expression: '(:cony-kiss:)',
             unicode: '0x100081'
           },
           {
-            path: require('@/static/img/line-emoji/rabbit-ignore.png'),
+            path: require('@/static/img/line-emoji/cony-with-tongue-out.png'),
+            expression: '(:cony-with-tongue-out:)',
             unicode: '0x100082'
           },
           {
-            path: require('@/static/img/line-emoji/rabbit-frozen.png'),
+            path: require('@/static/img/line-emoji/cony-shocked.png'),
+            expression: '(:cony-shocked:)',
             unicode: '0x100083'
           },
           {
-            path: require('@/static/img/line-emoji/bear-shying.png'),
+            path: require('@/static/img/line-emoji/brown-blush.png'),
+            expression: '(:brown-blush:)',
             unicode: '0x100084'
           },
           {
-            path: require('@/static/img/line-emoji/bear-surprise.png'),
+            path: require('@/static/img/line-emoji/brown-surprised.png'),
+            expression: '(:brown-surprised:)',
             unicode: '0x100085'
           },
           {
-            path: require('@/static/img/line-emoji/bear-zzz.png'),
+            path: require('@/static/img/line-emoji/brown-sleeping.png'),
+            expression: '(:brown-sleeping:)',
             unicode: '0x100086'
           },
           {
-            path: require('@/static/img/line-emoji/james-nervous.png'),
+            path: require('@/static/img/line-emoji/james-sweat.png'),
+            expression: '(:james-sweat:)',
             unicode: '0x100087'
           },
           {
-            path: require('@/static/img/line-emoji/james-waiting.png'),
+            path: require('@/static/img/line-emoji/james-exhausted.png'),
+            expression: '(:james-exhausted:)',
             unicode: '0x100088'
           },
           {
-            path: require('@/static/img/line-emoji/james-scare.png'),
+            path: require('@/static/img/line-emoji/james-panicking.png'),
+            expression: '(:james-panicking:)',
             unicode: '0x100089'
           },
           {
-            path: require('@/static/img/line-emoji/james-pleasure.png'),
+            path: require('@/static/img/line-emoji/james-wink-heart.png'),
+            expression: '(:james-wink-heart:)',
             unicode: '0x10008A'
           },
           {
-            path: require('@/static/img/line-emoji/james-lovestruck.png'),
+            path: require('@/static/img/line-emoji/james-heart-eyes.png'),
+            expression: '(:james-heart-eyes:)',
             unicode: '0x10008B'
           }
-        ]
+        ],
+        lineStickers: [
+          {
+            path: require('@/static/img/line-sticker/ok.png'),
+            packageId: '11539',
+            stickerId: '52114113'
+          },
+          {
+            path: require('@/static/img/line-sticker/thank-you.png'),
+            packageId: '11539',
+            stickerId: '52114110'
+          },
+          {
+            path: require('@/static/img/line-sticker/bye.png'),
+            packageId: '11538',
+            stickerId: '51626494'
+          },
+          {
+            path: require('@/static/img/line-sticker/not-see.png'),
+            packageId: '11538',
+            stickerId: '51626506'
+          },
+          {
+            path: require('@/static/img/line-sticker/sorry.png'),
+            packageId: '11537',
+            stickerId: '52002770'
+          }
+        ],
       }
     },
     methods: {
-      ...mapActions('lineStickerEmoji',
-        ['assignExpressionAction', 'assignLineStickerEmojiPathAction', 'assignEmojiUnicodeAction']),
+      ...mapActions('lineStickerEmoji', ['assignLineEmojiAction', 'assignLineStickerAction']),
       ...{
         selectLineEmoji (event, lineEmoji) {
           const vueModel = this
-          const dataSet = event.currentTarget.dataset
-          const emojiPath = dataSet.emojiPath
-          const emojiUnicode = dataSet.emojiUnicode
           vueModel.$modal.remove()
-          vueModel.assignExpressionAction(lineEmoji.expression)
-          vueModel.assignLineStickerEmojiPathAction(lineEmoji.path)
-          vueModel.assignEmojiUnicodeAction(lineEmoji.emojiUnicode)
+          vueModel.assignLineEmojiAction(lineEmoji)
+        },
+
+        selectLineSticker (event, lineSticker) {
+          const vueModel = this
+          vueModel.$modal.remove()
+          vueModel.assignLineStickerAction(lineSticker)
         }
       }
     }
