@@ -69,7 +69,7 @@ Vue.prototype.$delay = millisecond => {
 }
 
 Vue.config.errorHandler = (error, vueModel) => {
-  console.error(error.message)
+  console.error(error)
   vueModel.$modal.show({
     text: '發生錯誤囉！'
   })
