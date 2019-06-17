@@ -6,6 +6,7 @@ const replace = require('gulp-replace')
 const pngquant = require('imagemin-pngquant')
 const fs = require('fs').promises
 const path = require('path')
+const mergeStream = require('merge-stream')
 
 const distDir = path.join(__dirname, 'dist/')
 const storage = new Storage({
@@ -77,7 +78,22 @@ const minifyImage = sourceImage => {
 }
 
 const switchEnv = env => {
-  return gulp
+  const switchFirebaseAuth = gulp
+    .src(['./src/modules/firebase-auth.js'], {
+      base: './'
+    })
+    .pipe(
+      replace(/(export default (productionConfig|testConfig))/g, () => {
+        if (env === 'test') {
+          return 'export default testConfig'
+        } else {
+          return 'export default productionConfig'
+        }
+      })
+    )
+    .pipe(gulp.dest('./'))
+
+  const switchDomain = gulp
     .src(['./src/**/*.@(js|vue)'], {
       base: './'
     })
@@ -91,6 +107,8 @@ const switchEnv = env => {
       })
     )
     .pipe(gulp.dest('./'))
+
+  return mergeStream(switchFirebaseAuth, switchDomain)
 }
 
 gulp.task('minifyImage', minifyImage.bind(minifyImage, './src/static/img/**/*.@(jpg|png)'))
