@@ -277,8 +277,7 @@
           event.preventDefault()
 
           try {
-            await vueModel
-              .axios({
+            await vueModel.axios({
                 method: 'post',
                 url: 'https://www.ehanlin.com.tw/linebot/admin/pushChatMessage',
                 data: {
@@ -351,7 +350,7 @@
 
       .dialog-box {
         display: flex;
-        width: 75%;
+        width: 100%;
         min-height: 80px;
         align-items: center;
         margin-left: 3px;

@@ -151,7 +151,6 @@
         vueModel.messages = messages
 
         await vueModel.listeningOnMessageAdded()
-
       },
 
       async listeningOnMessageAdded () {
@@ -185,12 +184,11 @@
 
       async updateMessagesToRead () {
         const vueModel = this
-        let unreadMessages = await vueModel.$bindCollectionAsObject('unreadMessages',
+        const unreadMessages = await vueModel.$bindCollectionAsObject('unreadMessages',
           vueModel.messageRef
             .where('read', '==', false))
-
-        let batch = db.batch()
-        let readMessagesIds = Object.keys(unreadMessages)
+        const batch = db.batch()
+        const readMessagesIds = Object.keys(unreadMessages)
         if (readMessagesIds.length > 0) {
           readMessagesIds.forEach(id => {
             batch.update(vueModel.messageRef.doc(id), { read: true })
