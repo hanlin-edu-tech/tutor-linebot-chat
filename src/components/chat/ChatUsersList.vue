@@ -21,15 +21,15 @@
                 {{ messageInfo.lineUserName }}
               </mu-list-item-title>
               <span class="remove-identity"
-                    v-show="retrieveIdentity(lineUserId)" @click="removeIdentity(lineUserId)">
+                    v-show="!!messageInfo.identity" @click="removeIdentity(lineUserId)">
                 移除識別
               </span>
             </mu-flex>
             <mu-ripple class="entry-room"
                        @click="entryChatRoom(messageInfo, lineUserId)">
               <mu-list-item-sub-title>
-                <span v-show="retrieveIdentity(lineUserId)" class="identity">
-                  {{ retrieveIdentity(lineUserId) }}
+                <span v-show="!!messageInfo.identity" class="identity">
+                  {{ messageInfo.identity }}
                 </span>
               </mu-list-item-sub-title>
               <mu-list-item-sub-title>
@@ -78,13 +78,10 @@
       const vueModel = this
       return {
         isLoading: true,
-        identity: '',
         messages: [],
         showUsers: {},
-        oneMonthAgo: vueModel.$dayjs().subtract(1, 'month').toDate(),
-        chatRef: db.collection('Chat'),
-        identityRef: db.collection('Identity'),
-        identityMapping: new Map()
+        twoMonthAgo: vueModel.$dayjs().subtract(2, 'month').toDate(),
+        chatRef: db.collection('Chat')
       }
     },
 
@@ -99,19 +96,16 @@
       const vueModel = this
       await vueModel.initialUsersList()
       vueModel.listeningOnChatAdded()
-      vueModel.listeningOnIdentityUpsert()
     },
 
     methods: {
-      retrieveIdentity (lineUserId) {
-        const vueModel = this
-        return vueModel.identityMapping.get(lineUserId)
-      },
-
       async removeIdentity (lineUserId) {
         const vueModel = this
         try {
-          await db.collection('Identity').doc(lineUserId).delete()
+          await vueModel.chatRef.doc(lineUserId).set({
+            identity: '',
+            prerequisite: false
+          })
           vueModel.$modal.show({
             text: IdentityText.SUCCESS
           })
@@ -129,45 +123,7 @@
           .orderBy('updateTime', 'desc')
           .get()
 
-        return messageQuerySnapshot
-          .docChanges()
-          .map(messageDocChange => messageDocChange.doc)
-      },
-
-      async mappingLineUserIdentity (lineUserIds) {
-        const vueModel = this
-        const identityDocsSnapshot = await Promise.all(
-          lineUserIds.map(lineUserId => vueModel.identityRef.doc(lineUserId).get()))
-
-        identityDocsSnapshot
-          .filter(identityDocSnapshot => identityDocSnapshot.exists)
-          .forEach(identityDocSnapshot => {
-            const lineUserId = identityDocSnapshot.id
-            const identityInfo = identityDocSnapshot.data()
-            vueModel.identityMapping.set(lineUserId, identityInfo.identity)
-            vueModel.$forceUpdate()
-          })
-      },
-
-      listeningOnIdentityUpsert () {
-        const vueModel = this
-        vueModel.identityRef.onSnapshot(identityQuerySnapshot => {
-          const identityNewestChange = identityQuerySnapshot.docChanges().last()
-          let lineUserId, identityInfo
-          if (!identityNewestChange) {
-            return
-          }
-
-          lineUserId = identityNewestChange.doc.id
-          identityInfo = identityNewestChange.doc.data()
-          if (identityNewestChange.type === 'added' || identityNewestChange.type === 'modified') {
-            vueModel.identityMapping.set(lineUserId, identityInfo.identity)
-            vueModel.$forceUpdate()
-          } else if (identityNewestChange.type === 'removed') {
-            vueModel.identityMapping.delete(lineUserId)
-            vueModel.$forceUpdate()
-          }
-        })
+        return messageQuerySnapshot.docs
       },
 
       async composeMessageInfo (lineUserId, lineProfile, newestMessage, messageDocs, findUnreadUser = () => {}) {
@@ -181,6 +137,7 @@
           lineUserId: lineUserId,
           lineUserName: lineProfile.lineUserName,
           lineUserAvatar: lineProfile.lineUserAvatar,
+          identity: lineProfile.identity,
           text: newestMessage.text,
           updateTime: vueModel.$dayjs(newestMessage.updateTime.toDate()),
           unreadMessagesCount: unreadMessagesCount,
@@ -245,15 +202,18 @@
         const allUsers = {}
         const unreadUsers = {}
         const lineUsersInfo = []
-        let identityQuerySnapshot, isIdentityEmpty = false
-        let processFn, perCycleRecord, newestChatDocSnapshot
 
-        identityQuerySnapshot = await vueModel.identityRef.get()
-        if (identityQuerySnapshot.empty) {
-          isIdentityEmpty = true
-        }
+        let prerequisiteChatQuerySnapshot, chatQuerySnapshot
+        let isPrerequisite, totalRound
+        const perCycleRecord = 30
 
-        processFn = async chatDocs => {
+        const processFn = async chatQuerySnapshot => {
+          let chatDocs
+          if (chatQuerySnapshot.empty) {
+            return
+          }
+
+          chatDocs = chatQuerySnapshot.docs
           for (let chatDoc of chatDocs) {
             const lineUserId = chatDoc.id
             const lineUserProfile = chatDoc.data()
@@ -278,42 +238,50 @@
           vueModel.showUsers = { ...unreadUsers, ...allUsers }
         }
 
-        perCycleRecord = 20
-        const chatQuerySnapshot = await vueModel.chatRef
-          .where('updateTime', '>=', vueModel.oneMonthAgo)
-          .orderBy('updateTime', 'desc')
-          .limit(perCycleRecord)
-          .get()
+        const chatFirstQuery = async isPrerequisite => {
+          return await vueModel.chatRef
+            .where('updateTime', '>=', vueModel.twoMonthAgo)
+            .where('prerequisite', '==', isPrerequisite)
+            .orderBy('updateTime', 'desc')
+            .limit(perCycleRecord)
+            .get()
+        }
 
+        const separateChat = async (chatQuerySnapshot, isPrerequisite, totalRound) => {
+          let newestChatDocSnapshot = chatQuerySnapshot.docs.last()
+          for (let round = 1; round <= totalRound; round++) {
+            const chatQuerySnapshot = await vueModel.chatRef
+              .where('updateTime', '>=', vueModel.twoMonthAgo)
+              .where('prerequisite', '==', isPrerequisite)
+              .orderBy('updateTime', 'desc')
+              .startAfter(newestChatDocSnapshot)
+              .limit(perCycleRecord)
+              .get()
+
+            newestChatDocSnapshot = chatQuerySnapshot.docs.last()
+            await processFn(chatQuerySnapshot)
+          }
+        }
+
+        isPrerequisite = true
+        prerequisiteChatQuerySnapshot = await chatFirstQuery(isPrerequisite)
+        await processFn(prerequisiteChatQuerySnapshot)
+
+        totalRound = 3
+        await separateChat(prerequisiteChatQuerySnapshot, isPrerequisite, totalRound)
+
+        isPrerequisite = false
+        totalRound = 1
+        chatQuerySnapshot = await chatFirstQuery(isPrerequisite)
         if (chatQuerySnapshot.empty) {
           return
         }
+        await processFn(chatQuerySnapshot)
+        //await separateChat(chatQuerySnapshot, isPrerequisite, totalRound)
 
-        newestChatDocSnapshot = chatQuerySnapshot.docs.last()
-        await processFn(chatQuerySnapshot.docs)
-
-        for (let round = 1; round <= 10; round++) {
-          const chatQuerySnapshot = await vueModel.chatRef
-            .where('updateTime', '>=', vueModel.oneMonthAgo)
-            .orderBy('updateTime', 'desc')
-            .startAfter(newestChatDocSnapshot)
-            .limit(perCycleRecord)
-            .get()
-
-          if (chatQuerySnapshot.empty) {
-            break
-          }
-          newestChatDocSnapshot = chatQuerySnapshot.docs.last()
-          await processFn(chatQuerySnapshot.docs)
-        }
-
-        if (!isIdentityEmpty) {
-          await vueModel.mappingLineUserIdentity(lineUsersInfo.map(lineUserInfo => lineUserInfo.lineUserId))
-        }
-
+        vueModel.isLoading = false
         lineUsersInfo.forEach(lineUsersInfo =>
           vueModel.listeningOnMessageAdded(lineUsersInfo.lineUserId, lineUsersInfo.lineUserProfile))
-        vueModel.isLoading = false
       },
 
       resetZeroing (lineUserId) {
@@ -326,14 +294,15 @@
       listeningOnChatAdded () {
         const vueModel = this
         vueModel.chatRef
-          .where('updateTime', '>=', vueModel.oneMonthAgo)
+          .where('updateTime', '>=', vueModel.twoMonthAgo)
           .orderBy('updateTime', 'asc')
           .onSnapshot(
             async chatQuerySnapshot => {
               let chatNewestChange = chatQuerySnapshot.docChanges().last()
+              const lineUserId = chatNewestChange.doc.id
+              const lineUserProfile = chatNewestChange.doc.data()
+
               if (chatNewestChange.type === 'added') {
-                const lineUserId = chatNewestChange.doc.id
-                const lineUserProfile = chatNewestChange.doc.data()
                 if (vueModel.showUsers && !vueModel.showUsers[lineUserId]) {
                   const messageDocs = await vueModel.retrieveSpecificMessageDocs(lineUserId)
                   const newestMessage = messageDocs.last().data()
@@ -344,6 +313,12 @@
                     await vueModel.composeMessageInfo(lineUserId, lineUserProfile, newestMessage, messageDocs)
                   vueModel.showUsers = { ...newUserMessageInfo, ...vueModel.showUsers }
                   vueModel.listeningOnMessageAdded(lineUserId, lineUserProfile)
+                }
+              } else if (chatNewestChange.type === 'modified') {
+                if (vueModel.showUsers[lineUserId]) {
+                  vueModel.showUsers[lineUserId].identity = lineUserProfile.identity
+                  // Vue.set(vueModel.showUsers, lineUserId,
+                  //   await vueModel.composeMessageInfo(lineUserId, lineUserProfile, newestMessage, messageDocs))
                 }
               }
             }
@@ -369,15 +344,15 @@
       editIdentity (messageInfo, lineUserId) {
         const vueModel = this
         vueModel.showUsers[lineUserId].isEditIdentity = true
-        if (!messageInfo.identity) {
-          messageInfo.identity = vueModel.retrieveIdentity(lineUserId)
-        }
+        // if (!messageInfo.identity) {
+        //   messageInfo.identity = vueModel.retrieveIdentity(lineUserId)
+        // }
       },
 
       async saveIdentity (messageInfo, lineUserId) {
         const vueModel = this
         const now = firebase.firestore.Timestamp.fromDate(new Date())
-        let identityQuerySnapshot, identityDocRef, identityDocSnapshot
+        let chatDocSnapshot, chatDocRef
 
         vueModel.$refs[lineUserId][0].$refs['input'].value = ''
         if (!messageInfo.identity || messageInfo.identity.length === 0) {
@@ -387,32 +362,25 @@
           return
         }
 
-        identityQuerySnapshot = await vueModel.identityRef
-          .where('identity', '==', messageInfo.identity)
-          .get()
+        chatDocRef = vueModel.chatRef
+          .doc(lineUserId)
+        chatDocSnapshot = chatDocRef.get()
 
-        if (!identityQuerySnapshot.empty) {
+        if (chatDocSnapshot.exists) {
           vueModel.$modal.show({
             text: IdentityText.EXISTED_WARNING
           })
           return
         }
 
-        identityDocRef = vueModel.identityRef.doc(lineUserId)
-        identityDocSnapshot = identityDocRef.get()
-        if (identityDocSnapshot.exists) {
-          await identityDocRef.set({
-            identity: messageInfo.identity,
-            updateTime: now
-          }, { merge: true })
-        } else {
-          await identityDocRef.set({
-            identity: messageInfo.identity,
-            createTime: now,
-            updateTime: now
-          })
+        const identityInfo = {
+          identity: messageInfo.identity,
+          updateTime: now
         }
 
+        identityInfo.prerequisite = (messageInfo.identity.indexOf('先修班') >= 0)
+
+        await chatDocRef.set(identityInfo, { merge: true })
         vueModel.cancelEdit(lineUserId)
       },
 
@@ -464,7 +432,7 @@
 
       returnToOriginalShowUsers () {
         const vueModel = this
-        if (vueModel.originalShowUsers) {
+        if (!!vueModel.originalShowUsers) {
           vueModel.showUsers = vueModel.originalShowUsers
         }
       }

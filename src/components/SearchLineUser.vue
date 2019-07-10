@@ -1,7 +1,7 @@
 <template>
   <div id="search-line-user">
     <mu-flex align-items="center">
-      <mu-text-field label="以使用者識別搜尋對話" v-model="identity" full-width
+      <mu-text-field label="按 Enter 以使用者識別搜尋" v-model="identity" full-width
                      action-icon="search" @keyup.enter="retrieveSpecificLineUser"></mu-text-field>
       <mu-icon size="22" value="cancel" @click="cancelSearch()"></mu-icon>
     </mu-flex>
@@ -28,19 +28,19 @@
     methods: {
       async retrieveSpecificLineUser () {
         const vueModel = this
-        const identityQuerySnapshot = await db.collection('Identity')
+        const chatQuerySnapshot = await db.collection('Chat')
           .where('identity', '==', vueModel.identity)
           .get()
 
         let lineUserId = ''
-        if (identityQuerySnapshot.empty) {
+        if (chatQuerySnapshot.empty) {
           vueModel.$modal.show({
             text: IdentityText.NOT_FOUND
           })
           return
         }
 
-        identityQuerySnapshot.forEach(identityDoc => {
+        chatQuerySnapshot.forEach(identityDoc => {
           lineUserId = identityDoc.id
         })
 

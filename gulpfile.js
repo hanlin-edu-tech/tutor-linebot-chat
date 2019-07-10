@@ -116,6 +116,7 @@ gulp.task('minifyImage', minifyImage.bind(minifyImage, './src/static/img/**/*.@(
 /* 上傳 GCS */
 gulp.task('uploadToGcsTest', uploadToGCS.bind(uploadToGCS, 'tutor-apps-test/'))
 gulp.task('uploadToGcsProduction', uploadToGCS.bind(uploadToGCS, 'tutor-apps/'))
+
 gulp.task('switchTestEnv', switchEnv.bind(switchEnv, 'test'))
 gulp.task('switchProductionEnv', switchEnv.bind(switchEnv, 'production'))
 

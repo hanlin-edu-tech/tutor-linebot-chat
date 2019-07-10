@@ -53,7 +53,7 @@
       const vueModel = this
       return {
         isLoading: true,
-        oneMonthAgo: vueModel.$dayjs().subtract(1, 'month').toDate(),
+        twoMonthAgo: vueModel.$dayjs().subtract(2, 'month').toDate(),
         messageText: '',
         messages: {},
         isPreviewImage: false,
@@ -139,9 +139,9 @@
         }
 
         let messageQuerySnapshot = await vueModel.messageRef
-          .where('updateTime', '>', vueModel.oneMonthAgo)
+          .where('updateTime', '>', vueModel.twoMonthAgo)
           .orderBy('updateTime', 'asc')
-          .limit(500)
+          .limit(250)
           .get()
 
         let messages = {}
@@ -156,9 +156,9 @@
       async listeningOnMessageAdded () {
         const vueModel = this
         vueModel.cancelListening = db.collection(`Chat/${vueModel.specificLineUser}/Message`)
-          .where('updateTime', '>', vueModel.oneMonthAgo)
+          .where('updateTime', '>', vueModel.twoMonthAgo)
           .orderBy('updateTime', 'asc')
-          .limit(1000)
+          .limit(250)
           .onSnapshot(
             async messageQuerySnapshot => {
               let newestMessageDoc
